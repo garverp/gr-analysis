@@ -18,12 +18,11 @@ header = pmt.make_dict()
 ver_val = pmt.from_long(long(0))
 rate_val = pmt.from_double(25e6)
 time_val = pmt.make_tuple(pmt.from_uint64(0),pmt.from_double(0))
-size_val = pmt.from_long(24999999)
-#size_val = pmt.from_long(parse_file_metadata.ftype_to_size[blocks.GR_FILE_FLOAT])
+size_val = pmt.from_long(parse_file_metadata.ftype_to_size[blocks.GR_FILE_FLOAT])
 type_val = pmt.from_long(blocks.GR_FILE_FLOAT)
 cplx_val = pmt.PMT_T
 start_val = pmt.from_uint64(blocks.METADATA_HEADER_SIZE + 0)
-bytes_val = pmt.from_uint64(0)
+bytes_val = pmt.from_uint64(25000000*2*parse_file_metadata.ftype_to_size[blocks.GR_FILE_FLOAT])
 
 # Set header vals
 header = pmt.dict_add(header,pmt.intern("version"),ver_val)
