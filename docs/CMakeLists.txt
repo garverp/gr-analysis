@@ -1,4 +1,4 @@
-# Copyright 2011,2012 Free Software Foundation, Inc.
+# Copyright 2011 Free Software Foundation, Inc.
 #
 # This file is part of GNU Radio
 #
@@ -18,9 +18,18 @@
 # Boston, MA 02110-1301, USA.
 
 ########################################################################
-# Install public header files
+# Setup dependencies
 ########################################################################
-install(FILES
-    api.h
-    file_meta_sink.h DESTINATION include/analysis
-)
+find_package(Doxygen)
+
+########################################################################
+# Begin conditional configuration
+########################################################################
+if(ENABLE_DOXYGEN)
+
+########################################################################
+# Add subdirectories
+########################################################################
+add_subdirectory(doxygen)
+
+endif(ENABLE_DOXYGEN)

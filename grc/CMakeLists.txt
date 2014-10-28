@@ -1,4 +1,4 @@
-# Copyright 2011,2012 Free Software Foundation, Inc.
+# Copyright 2011 Free Software Foundation, Inc.
 #
 # This file is part of GNU Radio
 #
@@ -17,17 +17,6 @@
 # the Free Software Foundation, Inc., 51 Franklin Street,
 # Boston, MA 02110-1301, USA.
 
-########################################################################
-# Install public header files
-########################################################################
 install(FILES
-    api.h
-    square_ff.h
-    square_ff.h
-    bitsync.h
-    datetime.h
-    radiotext.h
-    pi.h
-    psn.h
-    EWS.h DESTINATION include/rbds
+    analysis_file_meta_sink.xml DESTINATION share/gnuradio/grc/blocks
 )

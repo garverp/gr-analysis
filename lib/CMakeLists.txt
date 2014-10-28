@@ -29,9 +29,21 @@ list(APPEND analysis_sources
     file_meta_sink_impl.cc
 )
 
+set(analysis_sources "${analysis_sources}" PARENT_SCOPE)
+if(NOT analysis_sources)
+	MESSAGE(STATUS "No C++ sources... skipping lib/")
+	return()
+endif(NOT analysis_sources)
+
 add_library(gnuradio-analysis SHARED ${analysis_sources})
-target_link_libraries(gnuradio-analysis ${Boost_LIBRARIES} ${GNURADIO_RUNTIME_LIBRARIES})
+target_link_libraries(gnuradio-analysis ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES})
 set_target_properties(gnuradio-analysis PROPERTIES DEFINE_SYMBOL "gnuradio_analysis_EXPORTS")
+
+if(APPLE)
+    set_target_properties(gnuradio-analysis PROPERTIES
+        INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib"
+    )
+endif(APPLE)
 
 ########################################################################
 # Install built library files
@@ -45,23 +57,23 @@ install(TARGETS gnuradio-analysis
 ########################################################################
 # Build and register unit test
 ########################################################################
-#include(GrTest)
+include(GrTest)
 
-#include_directories(${CPPUNIT_INCLUDE_DIRS})
+include_directories(${CPPUNIT_INCLUDE_DIRS})
 
-#list(APPEND test_analysis_sources
-#    ${CMAKE_CURRENT_SOURCE_DIR}/test_analysis.cc
-#    ${CMAKE_CURRENT_SOURCE_DIR}/qa_analysis.cc
-#)
+list(APPEND test_analysis_sources
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_analysis.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/qa_analysis.cc
+)
 
-#add_executable(test-analysis ${test_analysis_sources})
+add_executable(test-analysis ${test_analysis_sources})
 
-#target_link_libraries(
-#  test-analysis
-#  ${GNURADIO_RUNTIME_LIBRARIES}
-#  ${Boost_LIBRARIES}
-#  ${CPPUNIT_LIBRARIES}
-#  gnuradio-analysis
-#)
+target_link_libraries(
+  test-analysis
+  ${GNURADIO_RUNTIME_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${CPPUNIT_LIBRARIES}
+  gnuradio-analysis
+)
 
-#GR_ADD_TEST(test_analysis test-analysis)
+GR_ADD_TEST(test_analysis test-analysis)

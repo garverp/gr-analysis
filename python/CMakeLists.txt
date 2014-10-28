@@ -1,4 +1,4 @@
-# Copyright 2011,2012 Free Software Foundation, Inc.
+# Copyright 2011 Free Software Foundation, Inc.
 #
 # This file is part of GNU Radio
 #
@@ -18,50 +18,27 @@
 # Boston, MA 02110-1301, USA.
 
 ########################################################################
-# Setup library
+# Include python install macros
 ########################################################################
-include(GrPlatform) #define LIB_SUFFIX
-
-include_directories(${Boost_INCLUDE_DIR})
-link_directories(${Boost_LIBRARY_DIRS})
-
-list(APPEND analysis_sources
-    file_meta_sink_impl.cc
-)
-
-add_library(gnuradio-analysis SHARED ${analysis_sources})
-target_link_libraries(gnuradio-analysis ${Boost_LIBRARIES} ${GNURADIO_RUNTIME_LIBRARIES})
-set_target_properties(gnuradio-analysis PROPERTIES DEFINE_SYMBOL "gnuradio_analysis_EXPORTS")
+include(GrPython)
+if(NOT PYTHONINTERP_FOUND)
+    return()
+endif()
 
 ########################################################################
-# Install built library files
+# Install python sources
 ########################################################################
-install(TARGETS gnuradio-analysis
-    LIBRARY DESTINATION lib${LIB_SUFFIX} # .so/.dylib file
-    ARCHIVE DESTINATION lib${LIB_SUFFIX} # .lib file
-    RUNTIME DESTINATION bin              # .dll file
+GR_PYTHON_INSTALL(
+    FILES
+    __init__.py
+    DESTINATION ${GR_PYTHON_DIR}/analysis
 )
 
 ########################################################################
-# Build and register unit test
+# Handle the unit tests
 ########################################################################
 include(GrTest)
 
-include_directories(${CPPUNIT_INCLUDE_DIRS})
-
-list(APPEND test_analysis_sources
-    ${CMAKE_CURRENT_SOURCE_DIR}/test_analysis.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/qa_analysis.cc
-)
-
-add_executable(test-analysis ${test_analysis_sources})
-
-target_link_libraries(
-  test-analysis
-  ${GNURADIO_RUNTIME_LIBRARIES}
-  ${Boost_LIBRARIES}
-  ${CPPUNIT_LIBRARIES}
-  gnuradio-analysis
-)
-
-GR_ADD_TEST(test_analysis test-analysis)
+set(GR_TEST_TARGET_DEPS gnuradio-analysis)
+set(GR_TEST_PYTHON_DIRS ${CMAKE_BINARY_DIR}/swig)
+GR_ADD_TEST(qa_file_meta_sink ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_file_meta_sink.py)
