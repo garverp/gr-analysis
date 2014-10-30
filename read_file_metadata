@@ -24,7 +24,7 @@ import sys
 from optparse import OptionParser
 
 import pmt
-from gnuradio.blocks import parse_file_metadata
+import parse_file_metadata_local
 
 def main(filename, detached=False):
     handle = open(filename, "rb")
@@ -34,7 +34,7 @@ def main(filename, detached=False):
     while(True):
         # read out next header bytes
         hdr_start = handle.tell()
-        header_str = handle.read(parse_file_metadata.HEADER_LENGTH)
+        header_str = handle.read(parse_file_metadata_local.HEADER_LENGTH)
         if(len(header_str) == 0):
             break
 
@@ -46,7 +46,7 @@ def main(filename, detached=False):
             sys.exit(1)
 
         print "HEADER {0}".format(nheaders)
-        info = parse_file_metadata.parse_header(header, True)
+        info = parse_file_metadata_local.parse_header(header, True)
 
         if(info["extra_len"] > 0):
             extra_str = handle.read(info["extra_len"])
@@ -60,10 +60,10 @@ def main(filename, detached=False):
                 sys.exit(1)
 
             print "\nExtra Header:"
-            extra_info = parse_file_metadata.parse_extra_dict(extra, info, True)
+            extra_info = parse_file_metadata_local.parse_extra_dict(extra, info, True)
 
         nheaders += 1
-        nread += parse_file_metadata.HEADER_LENGTH + info["extra_len"]
+        nread += parse_file_metadata_local.HEADER_LENGTH + info["extra_len"]
         if(not detached):
             nread += info['nbytes']
         handle.seek(nread, 0)
