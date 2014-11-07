@@ -101,6 +101,7 @@ def parse_header(p, VERBOSE=False):
         r = pmt.dict_ref(p, pmt.string_to_symbol("size"), dump)
         dsize = pmt.to_long(r)
         info["size"] = dsize
+	print dsize
         if(VERBOSE):
             print "Item size: {0}".format(dsize)
     else:
@@ -115,6 +116,7 @@ def parse_header(p, VERBOSE=False):
         info["type"] = stype
         if(VERBOSE):
             print "Data Type: {0} ({1})".format(stype, dtype)
+	print dtype
     else:
         sys.stderr.write("Could not find key 'type': invalid or corrupt data file.\n")
         sys.exit(1)
@@ -122,14 +124,42 @@ def parse_header(p, VERBOSE=False):
     # EXTRACT COMPLEX
     if(pmt.dict_has_key(p, pmt.string_to_symbol("cplx"))):
         r = pmt.dict_ref(p, pmt.string_to_symbol("cplx"), dump)
-        cplx = pmt.to_bool(r)
+        #global cplx 
+	cplx = pmt.to_bool(r)
         info["cplx"] = cplx
         if(VERBOSE):
             print "Complex? {0}".format(cplx)
+	global vecchk
+	global tsize
+	#print cplx
+	#print dtype
+	#print dsize
+    	if(cplx==False):
+		if(dtype==0):
+			tsize=1
+		elif(dtype==1):
+			tsize=4
+		elif(dtype==2):
+			tsize=4
+		elif(dtype==3):
+			tsize=4
+		elif(dtype==5):
+			tsize=4
+		elif(dtype==6):
+			tsize=8
+		else:
+			tsize=64
+		#print tsize
+		vecchk = dsize/tsize
+		#print vecchk
+    		if(vecchk>1):
+			print "The data is a vector containing {0} elements.".format(vecchk)
+    		else:
+			print "The data is not a vector."
     else:
         sys.stderr.write("Could not find key 'cplx': invalid or corrupt data file.\n")
         sys.exit(1)
-
+		
     # EXTRACT WHERE CURRENT SEGMENT STARTS
     if(pmt.dict_has_key(p, pmt.string_to_symbol("strt"))):
         r = pmt.dict_ref(p, pmt.string_to_symbol("strt"), dump)
@@ -153,10 +183,11 @@ def parse_header(p, VERBOSE=False):
         nitems = nbytes/dsize
         info["nitems"] = nitems
         info["nbytes"] = nbytes
-
+	#info["types"] = types
         if(VERBOSE):
             print "Size of Data: {0} bytes".format(nbytes)
             print "              {0} items".format(nitems)
+	 
     else:
         sys.stderr.write("Could not find key 'size': invalid or corrupt data file.\n")
         sys.exit(1)
