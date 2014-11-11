@@ -28,9 +28,10 @@ import parse_file_metadata_local
 
 def main(filename, detached=False):
     handle = open(filename, "rb")
-
+    times = 0
     nheaders = 0
     nread = 0
+    totaltime = 0
     while(True):
         # read out next header bytes
         hdr_start = handle.tell()
@@ -47,6 +48,10 @@ def main(filename, detached=False):
 
         print "HEADER {0}".format(nheaders)
         info = parse_file_metadata_local.parse_header(header, True)
+        deltat = info["nitems"]/info["rx_rate"]
+        totaltime = totaltime + deltat
+        print "Time in this chunk: {0:.6f}".format(deltat)
+        print "Total Time elapsed: {0:.6f}".format(totaltime)
 
         if(info["extra_len"] > 0):
             extra_str = handle.read(info["extra_len"])
@@ -68,6 +73,8 @@ def main(filename, detached=False):
             nread += info['nbytes']
         handle.seek(nread, 0)
         print "\n\n"
+    
+    
 
 if __name__ == "__main__":
     usage="%prog: [options] filename"
