@@ -22,5 +22,7 @@
 ########################################################################
 install(FILES
     api.h
+    file_meta_sink.h
+    file_meta_sink.h
     file_meta_sink.h DESTINATION include/analysis
 )

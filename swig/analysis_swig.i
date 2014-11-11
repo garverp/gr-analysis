@@ -9,8 +9,15 @@
 
 %{
 #include "analysis/file_meta_sink.h"
+#include "analysis/file_meta_sink.h"
+#include "analysis/file_meta_sink.h"
+#include "analysis/file_meta_sink.h"
 %}
 
 
+%include "analysis/file_meta_sink.h"
+GR_SWIG_BLOCK_MAGIC2(analysis, file_meta_sink);
+%include "analysis/file_meta_sink.h"
+GR_SWIG_BLOCK_MAGIC2(analysis, file_meta_sink);
 %include "analysis/file_meta_sink.h"
 GR_SWIG_BLOCK_MAGIC2(analysis, file_meta_sink);
