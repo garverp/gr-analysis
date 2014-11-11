@@ -76,7 +76,7 @@ def parse_header(p, VERBOSE=False):
         samp_rate = pmt.to_double(r)
         info["rx_rate"] = samp_rate
         if(VERBOSE):
-            print "Sample Rate: {0:.2f} sps".format(samp_rate)
+            print "Sample Rate: {0:2.1e} sps".format(samp_rate)
     else:
         sys.stderr.write("Could not find key 'sr': invalid or corrupt data file.\n")
         sys.exit(1)
@@ -185,9 +185,14 @@ def parse_header(p, VERBOSE=False):
         info["nbytes"] = nbytes
 	#info["types"] = types
         if(VERBOSE):
+<<<<<<< HEAD
             print "Size of Data: {0} bytes".format(nbytes)
             print "              {0} items".format(nitems)
 	 
+=======
+            print "Size of Data: {0:2.1e} bytes".format(nbytes)
+            print "              {0:2.1e} items".format(nitems)
+>>>>>>> 1f978ce2e1c8dd6fcca7d98a4152856aee35e674
     else:
         sys.stderr.write("Could not find key 'size': invalid or corrupt data file.\n")
         sys.exit(1)
