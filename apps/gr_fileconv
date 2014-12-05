@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+# Convert interleaved shorts to complex floats
+
+from gnuradio import blocks
+from gnuradio import eng_notation
+from gnuradio import gr
+from gnuradio.eng_option import eng_option
+from gnuradio.filter import firdes
+import argparse
+
+class fileconv(gr.top_block):
+
+    def __init__(self,args):
+        gr.top_block.__init__(self)
+
+        ##################################################
+        # Variables
+        ##################################################
+        self.samp_rate = samp_rate = 25e6
+        infile=args.input_file
+        outfile=args.output_file
+        ##################################################
+        # Blocks
+        ##################################################
+        self.blocks_interleaved_short_to_complex_0 = blocks.interleaved_short_to_complex(False, False)
+        self.blocks_file_source_0 = blocks.file_source(gr.sizeof_short*1,infile, False)
+        self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1,outfile, False)
+        self.blocks_file_sink_0.set_unbuffered(False)
+
+        ##################################################
+        # Connections
+        ##################################################
+        self.connect((self.blocks_file_source_0, 0), (self.blocks_interleaved_short_to_complex_0, 0))
+        self.connect((self.blocks_interleaved_short_to_complex_0, 0), (self.blocks_file_sink_0, 0))
+
+
+
+    def get_samp_rate(self):
+        return self.samp_rate
+
+    def set_samp_rate(self, samp_rate):
+        self.samp_rate = samp_rate
+def main():
+   parser = argparse.ArgumentParser()
+   parser.add_argument("input_file",help="Input filename")
+   parser.add_argument("output_file",help="Output filename")
+   args = parser.parse_args()
+   # Build the flowgraph
+   tb = fileconv(args);
+   # Execute
+   tb.run()
+if __name__ == '__main__':
+   main()

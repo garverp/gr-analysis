@@ -1,19 +1,21 @@
 /* -*- c++ -*- */
-/* 
- * Copyright 2014 <+YOU OR YOUR COMPANY+>.
- * 
- * This is free software; you can redistribute it and/or modify
+/*
+ * Copyright 2012 Free Software Foundation, Inc.
+ *
+ * This file is part of GNU Radio
+ *
+ * GNU Radio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
- * 
- * This software is distributed in the hope that it will be useful,
+ *
+ * GNU Radio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
- * along with this software; see the file COPYING.  If not, write to
+ * along with GNU Radio; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street,
  * Boston, MA 02110-1301, USA.
  */
@@ -22,25 +24,14 @@
 #include "config.h"
 #endif
 
-#include <gnuradio/io_signature.h>
 #include "file_meta_sink_impl.h"
+#include <gnuradio/io_signature.h>
 #include <cstdio>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdexcept>
 #include <stdio.h>
-#include <boost/program_options.hpp>
-#include <boost/format.hpp>
-#include <boost/thread.hpp>
-#include <boost/atomic.hpp>
-#include <uhd/utils/atomic.hpp>
-#include <uhd/types/tune_request.hpp>
-#include <uhd/utils/thread_priority.hpp>
-#include <uhd/utils/safe_main.hpp>
-#include <uhd/usrp/multi_usrp.hpp>
-#include <uhd/exception.hpp>
-#include <uhd/transport/bounded_buffer.hpp>
 
 // win32 (mingw/msvc) specific
 #ifdef HAVE_IO_H
@@ -60,12 +51,8 @@
 #endif
 
 
-namespace po = boost::program_options;
-boost::atomic<bool> done(false);
-uhd::atomic_uint32_t num_elements;
-
 namespace gr {
-  namespace analysis {
+  namespace blocks {
 
 
     file_meta_sink::sptr
@@ -255,7 +242,6 @@ namespace gr {
     void
     file_meta_sink_impl::write_header(FILE *fp, pmt::pmt_t header, pmt::pmt_t extra)
     {
-    	/*
       std::string header_str = pmt::serialize_str(header);
       std::string extra_str = pmt::serialize_str(extra);
 
@@ -285,13 +271,11 @@ namespace gr {
       }
 
       fflush(fp);
-      */
     }
 
     void
     file_meta_sink_impl::update_header(pmt::pmt_t key, pmt::pmt_t value)
     {
-    /*
       // Special handling caveat to transform rate from radio source into
       // the rate at this sink.
       if(pmt::eq(key, mp("rx_rate"))) {
@@ -309,18 +293,15 @@ namespace gr {
 	d_extra = pmt::dict_add(d_extra, key, value);
 	d_extra_size = pmt::serialize_str(d_extra).size();
       }
-      */
     }
 
     void
     file_meta_sink_impl::update_last_header()
     {
-    /*
       if(d_state == STATE_DETACHED)
 	update_last_header_detached();
       else
 	update_last_header_inline();
-*/
     }
 
     void
@@ -481,32 +462,6 @@ namespace gr {
 
       return nwritten;
     }
-    
-    // specvrec writing
-    void file_meta_sink_impl::usrp_write_samples_to_file(int fd, 
-     uhd::transport::bounded_buffer<circbuff_element_t>* cb){
-	   int bytes_written = 0;
-	   circbuff_element_t write_ele;
-	   while (!done){
-	      // Block until we have some data to write
-	      cb->pop_with_wait(write_ele); 
-	      bytes_written = write(fd,(void*)&write_ele,CB_ELEMENT_SIZE);
-	      sync_file_range(fd,0,0,SYNC_FILE_RANGE_WRITE);
-	      if( bytes_written != CB_ELEMENT_SIZE ){
-		 if( bytes_written < 0 ){
-		    printf("Problem writing: %s\n",strerror(errno));
-		 }else{
-		    printf("Wrote %d/%d bytes\n",bytes_written,CB_ELEMENT_SIZE);
-		 }
-	      }
-	      num_elements.dec();
-	   }
-	}
-    
-    
-    
-    
-    
-  } /* namespace analysis */
-} /* namespace gr */
 
+  } /* namespace blocks */
+} /* namespace gr */

@@ -1,45 +1,36 @@
 /* -*- c++ -*- */
-/* 
- * Copyright 2014 <+YOU OR YOUR COMPANY+>.
- * 
- * This is free software; you can redistribute it and/or modify
+/*
+ * Copyright 2012 Free Software Foundation, Inc.
+ *
+ * This file is part of GNU Radio
+ *
+ * GNU Radio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
- * 
- * This software is distributed in the hope that it will be useful,
+ *
+ * GNU Radio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
- * along with this software; see the file COPYING.  If not, write to
+ * along with GNU Radio; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street,
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef INCLUDED_ANALYSIS_FILE_META_SINK_IMPL_H
-#define INCLUDED_ANALYSIS_FILE_META_SINK_IMPL_H
+#ifndef INCLUDED_BLOCKS_FILE_META_SINK_IMPL_H
+#define INCLUDED_BLOCKS_FILE_META_SINK_IMPL_H
 
-#include <analysis/file_meta_sink.h>
+#include <gnuradio/blocks/file_meta_sink.h>
 #include <pmt/pmt.h>
 #include <gnuradio/thread/thread.h>
-#include <uhd/types/tune_request.hpp>
-#include <uhd/utils/thread_priority.hpp>
-#include <uhd/utils/safe_main.hpp>
-#include <uhd/usrp/multi_usrp.hpp>
-#include <uhd/exception.hpp>
-#include <uhd/transport/bounded_buffer.hpp>
-
-#define CB_ELEMENT_SIZE 4096
-typedef struct circbuff_element{
-   char a[CB_ELEMENT_SIZE];
-} circbuff_element_t;
 
 using namespace pmt;
 
 namespace gr {
-  namespace analysis {
+  namespace blocks {
 
     class file_meta_sink_impl : public file_meta_sink
     {
@@ -73,7 +64,7 @@ namespace gr {
       void update_last_header_detached();
       void write_and_update();
       void update_rx_time();
-	void usrp_write_samples_to_file(int fd, uhd::transport::bounded_buffer<circbuff_element_t>* cb);
+
       bool _open(FILE **fp, const char *filename);
 
     public:
@@ -98,8 +89,8 @@ namespace gr {
 	       gr_vector_const_void_star &input_items,
 	       gr_vector_void_star &output_items);
     };
-  } // namespace analysis
-} // namespace gr
 
-#endif /* INCLUDED_ANALYSIS_FILE_META_SINK_IMPL_H */
+  } /* namespace blocks */
+} /* namespace gr */
 
+#endif /* INCLUDED_BLOCKS_FILE_META_SINK_IMPL_H */

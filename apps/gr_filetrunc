@@ -6,19 +6,31 @@ from gnuradio import gr
 from gnuradio import blocks
 from gnuradio.eng_option import eng_option
 from gnuradio import eng_notation
+import pmt
+from optparse import OptionParser
 
 import argparse
 import os
-
+def read_header(filename):
+   	hdr_filename = filename
+    	hdr_file = open(hdr_filename,'r')
+  	header = pmt.make_dict()   
+	hdr_str = hdr_file.read(149)
+	header = pmt.deserialize_str(hdr_str)
+	keys = pmt.dict_keys(header)
+	values = pmt.dict_values(header)
+        print keys
+	print values
+	rx_rate = pmt.nth(2,values)
+	return rx_rate
 
 class build_block(gr.top_block):
-	def __init__(self,args):
+	def __init__(self,args,rx_rate):
 		gr.top_block.__init__(self)
                 ## Vars ##
-		sample_rate=25e6
+		sample_rate=rx_rate
+		print sample_rate
                 num_secs=5;
-                #sample_len=long(sample_rate*1)
-                #sample_offset=long(sample_rate*num_secs);
                 sample_offset=long(args.start);
                 sample_len=long(args.nsamps);
                 infile=args.input_file
@@ -28,14 +40,19 @@ class build_block(gr.top_block):
                 print 'Input File:' + infile
                 print 'Output File:' + outfile
                 ## Blocks ##
+		print "1"
 		fsrc = blocks.file_source(gr.sizeof_short*1,infile,False)
                 # SEEK_SET is offset from beginning, sample_offset is in samples
-                fsrc.seek(sample_offset*2,os.SEEK_SET)
-                short_to_cpx = blocks.interleaved_short_to_complex(False,False)
+		print "2"                
+		fsrc.seek(sample_offset*2,os.SEEK_SET)
+                print '2.5'
+		short_to_cpx = blocks.interleaved_short_to_complex(False)
                 # Copies sample_len then exits
+		print "3"
                 head = blocks.head(gr.sizeof_gr_complex*1,sample_len)
                 #skip_head = blocks.skiphead(gr.sizeof_gr_complex*1,sample_offset)
-                fsink = blocks.file_sink(gr.sizeof_gr_complex*1,outfile)
+		print "4"               
+		fsink = blocks.file_sink(gr.sizeof_gr_complex*1,outfile)
                 #throttle = blocks.throttle(gr.sizeof_gr_complex*1,sample_rate,True)
                 ## Connect Blocks
                 self.connect(fsrc,short_to_cpx,head,fsink)
@@ -45,14 +62,21 @@ def main ():
    parser = argparse.ArgumentParser()
    parser.add_argument("input_file",help="Input filename")
    parser.add_argument("output_file",help="Output filename")
-   parser.add_argument("-s","--start",type=long,
+<<<<<<< HEAD:gr-analysis/python/filetrunc.py
+   parser.add_argument("-s","--start",type=long, default = 0,
                      help="Starting sample index [default=%default]")
+   parser.add_argument("-n","--nsamps",type=long,default = 0,help="# samples")
+=======
+   parser.add_argument("-s","--start",type=long,
+                     help="Starting sample index")
    parser.add_argument("-n","--nsamps",type=long,help="# samples")
+>>>>>>> a0ee34f72f3192ba910daef2962cfab94f0aed74:gr-analysis/apps/gr_filetrunc
    args = parser.parse_args()
+   rx_rate = read_header(args.input_file)
    # Build the flowgraph
-   tb = build_block (args)
+   tb = build_block (args,rx_rate)
    # Execute
-   tb.run()
+   #tb.run()
 if __name__=='__main__':
    main ()
 
