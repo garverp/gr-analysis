@@ -1,59 +1,196 @@
 #!/usr/bin/python
 # Selects a subset of samples out of pre-recorded data
-# PWG 10.15.2014
+# Support for headers
 
 from gnuradio import gr
 from gnuradio import blocks
 from gnuradio.eng_option import eng_option
-from gnuradio import eng_notation
-
-import argparse
+from optparse import OptionParser
+from gnuradio.blocks import parse_file_metadata
+import pmt
+import sys
 import os
 
+enum_to_shortnames = {0:'unknown', 1:'ishort', 2:'cpxfloat'}
+shortnames_to_enum = {v: k for k, v in enum_to_shortnames.items()}
 
-class build_block(gr.top_block):
-	def __init__(self,args):
-		gr.top_block.__init__(self)
-                ## Vars ##
-		sample_rate=25e6
-                num_secs=5;
-                #sample_len=long(sample_rate*1)
-                #sample_offset=long(sample_rate*num_secs);
-                sample_offset=long(args.start);
-                sample_len=long(args.nsamps);
-                infile=args.input_file
-                outfile=args.output_file
-                print 'Sample Offset:' + repr(sample_offset)
-                print 'Sample Length:' + repr(sample_len)
-                print 'Input File:' + infile
-                print 'Output File:' + outfile
-                ## Blocks ##
-		fsrc = blocks.file_source(gr.sizeof_short*1,infile,False)
-                # SEEK_SET is offset from beginning, sample_offset is in samples
-                fsrc.seek(sample_offset*2,os.SEEK_SET)
-                short_to_cpx = blocks.interleaved_short_to_complex(False,False)
+def get_options():
+    usage = "%prog: <input_file> <output_file>"
+    desc = "Selects a subsection of a recorded file with headers"
+    desc += "\n Attempts to open <input_file.hdr> exists"
+    parser = OptionParser(usage=usage, description=desc,
+             option_class=eng_option)
+    parser.add_option("-S", "--start", type="eng_float", default=0,
+           help="Starting sample index.  Applies AFTER type conversion \
+           [default=%default]")
+    parser.add_option("-N", "--nsamples", type="eng_float", default=0,
+           help="Number of samples to output. If not specified, output all")
+    parser.add_option("-v", "--verbose", action="store_true", default=False,
+           help="Verbose Output")
+    parser.add_option("-t", "--output-type", type="choice", default="unknown",
+            choices=shortnames_to_enum.keys(), help="Output data type. \
+                     If not specified, output file is same format as input")
+    (options, args) = parser.parse_args()
+    if len(args) != 2:
+        parser.print_help()
+        raise SystemExit(1)
+    return (options, args)
+def read_header(infile):
+    filename = infile + '.hdr'
+    try:
+        handle = open(filename, "rb")
+    except IOError:
+        sys.stderr.write("Unable to open input file\n")
+        sys.exit(1)
+    header_str = handle.read(parse_file_metadata.HEADER_LENGTH)
+    if len(header_str) == 0:
+        sys.stderr.write("Header is empty\n")
+        sys.exit(1)
+    # String to PMT Conversion
+    try:
+        header = pmt.deserialize_str(header_str)
+    except RuntimeError:
+        sys.stderr.write("Can't deserialize header: invalid/corrupt data\n")
+        sys.exit(1)
+    return header
+
+def find_shortname(cpx, the_type, item_size):
+    shortname_type = shortnames_to_enum["unknown"]
+    # Interleaved Short
+    if cpx == True and the_type == "short" and item_size == 2*gr.sizeof_short:
+        return shortnames_to_enum["ishort"]
+    # Complex Float
+    if cpx == True and the_type == "float" and item_size == gr.sizeof_float:
+        return shortnames_to_enum["cpxfloat"]
+    return shortname_type
+
+def write_out_hdr(hdr_in, options, outfile):
+    hdr_filename = outfile + '.hdr'
+    dump = pmt.PMT_NIL
+    try:
+        hdr_file = open(hdr_filename, 'wb')
+    except IOError:
+        sys.stderr.write("Can't Open output file\n")
+        sys.exit(1)
+    print hdr_in
+    print 'is dict?' + repr(pmt.is_dict(hdr_in))
+    if pmt.dict_has_key(hdr_in, pmt.intern("version")):
+        ver = pmt.dict_ref(hdr_in,pmt.intern("version"),dump)
+    if pmt.dict_has_key(hdr_in,pmt.intern("rx_rate")):
+        rx_rate = pmt.dict_ref(hdr_in,pmt.intern("rx_rate"),dump)
+
+    hdr_out = pmt.make_dict()
+    hdr_out = pmt.dict_add(hdr_out,pmt.intern("version"),ver)
+    hdr_out = pmt.dict_add(hdr_out,pmt.intern("rx_rate"),rx_rate)
+    hdr_out_str = pmt.serialize_str(hdr_out)
+    hdr_file.write(hdr_out_str)
+class buildblock(gr.top_block):
+    def __init__(self, options, args, hdr_in):
+        gr.top_block.__init__(self)
+        ## Vars ##
+        sample_offset = long(options.start)
+        sample_len = long(options.nsamples)
+        output_all = False
+        if sample_len == 0:
+            output_all = True
+        infile = args[0]
+        outfile = args[1]
+
+        # Construct the extras
+        rxfreq = pmt.intern("rx_freq")
+        rxfreq_val = pmt.from_double(2.437e9)
+        
+        extras = pmt.make_dict()
+        extras = pmt.dict_add(extras,rxfreq,rxfreq_val)
+        extras_str = pmt.serialize_str(extras)
+
+        info = parse_file_metadata.parse_header(hdr_in, True)
+        #write_out_hdr(hdr_in, options, outfile)
+        shortname_intype = find_shortname(info['cplx'], info['type'],
+                info['size'])
+        if shortname_intype == shortnames_to_enum["unknown"]:
+            sys.stderr.write("Unsupported data type\n")
+            sys.exit(1)
+        if options.output_type == 'unknown':
+            shortname_outtype = shortname_intype
+        else:
+            shortname_outtype = shortnames_to_enum[options.output_type]
+        if options.verbose:
+            print 'Sample Offset:' + "{:.4e}".format(sample_offset)
+            print 'Sample Length:' + "{:.4e}".format(sample_len)
+            print 'Input File:' + infile
+            print 'Input File Header:' + infile + '.hdr'
+            print 'Input Type:' + enum_to_shortnames[shortname_intype]
+            print 'Output File:' + outfile
+            print 'Output File Header:' + outfile + '.hdr'
+            print 'Output Type:' + \
+            enum_to_shortnames[shortname_outtype]
+        ## Interleaved Short input 
+        if shortname_intype == shortnames_to_enum['ishort']:
+            fsrc = blocks.file_source(gr.sizeof_short*1,infile, False)
+            # SEEK_SET is offset from beginning, sample_offset is in samples
+            # Factor of 2 because vector of length 2 (since interleaved)
+            fsrc.seek(sample_offset*2, os.SEEK_SET)
+            # ishort in / cpxfloat out
+            if shortname_outtype == shortnames_to_enum['cpxfloat']:
+                ishort_to_cpxfloat = blocks.interleaved_short_to_complex(False, False)
                 # Copies sample_len then exits
-                head = blocks.head(gr.sizeof_gr_complex*1,sample_len)
-                #skip_head = blocks.skiphead(gr.sizeof_gr_complex*1,sample_offset)
-                fsink = blocks.file_sink(gr.sizeof_gr_complex*1,outfile)
-                #throttle = blocks.throttle(gr.sizeof_gr_complex*1,sample_rate,True)
-                ## Connect Blocks
-                self.connect(fsrc,short_to_cpx,head,fsink)
-		#self.connect(src0, (dst,0))
-		#self.connect(src1, (dst,1))
+                head = blocks.head(gr.sizeof_gr_complex*1, sample_len)
+                #fsink = blocks.file_sink(gr.sizeof_gr_complex*1, outfile)
+                fsink = blocks.file_meta_sink(gr.sizeof_gr_complex,
+                        outfile,info["rx_rate"],1,blocks.GR_FILE_FLOAT,True,
+                        1000000,extras_str,True)
+                if output_all:
+                    self.connect(fsrc, ishort_to_cpxfloat, fsink)
+                else:
+                    self.connect(fsrc, ishort_to_cpxfloat, head, fsink)
+            # ishort in / ishort out
+            elif shortname_outtype == shortnames_to_enum['ishort']:
+                head = blocks.head(gr.sizeof_short, sample_len)
+                #fsink = blocks.file_sink(gr.sizeof_short, outfile)
+                fsink = blocks.file_meta_sink(gr.sizeof_short,outfile,
+                        info['rx_rate'],1,blocks.GR_FILE_SHORT,True,
+                        1000000,extras_str,True)
+                if output_all:
+                    self.connect(fsrc, fsink)
+                else:
+                    self.connect(fsrc, head, fsink)
+        ## Complex float input
+        elif shortname_intype == shortnames_to_enum['cpxfloat']:
+            fsrc = blocks.file_source(gr.sizeof_gr_complex*1, infile, False)
+            # SEEK_SET is offset from beginning, sample_offset is in samples
+            fsrc.seek(sample_offset, os.SEEK_SET)
+            # cpxfloat in / cpxfloat out
+            if shortname_outtype == shortnames_to_enum['cpxfloat']:
+                head = blocks.head(gr.sizeof_gr_complex*1, sample_len)
+                #fsink = blocks.file_sink(gr.sizeof_gr_complex*1, outfile)
+                fsink = blocks.file_meta_sink(gr.sizeof_gr_complex,outfile,
+                        info['rx_rate'],1,blocks.GR_FILE_FLOAT,True,
+                        1000000,extras_str,True)
+                if output_all:
+                    self.connect(fsrc, fsink)
+                else:
+                    self.connect(fsrc, head, fsink)
+            # cpxfloat in / ishort out
+            elif shortname_outtype == shortnames_to_enum['ishort']:
+                cpxfloat_to_ishort = blocks.complex_to_interleaved_short(False)
+                head = blocks.head(gr.sizeof_short, sample_len)
+                #fsink = blocks.file_sink(gr.sizeof_short, outfile)
+                fsink = blocks.file_meta_sink(gr.sizeof_short,outfile,
+                        info['rx_rate'],1,blocks.GR_FILE_SHORT,True,
+                        1e6,extras_str,True)
+                if output_all:
+                    self.connect(fsrc,cpxfloat_to_ishort,fsink)
+                else:
+                    self.connect(fsrc, cpxfloat_to_ishort, head, fsink)
 def main ():
-   parser = argparse.ArgumentParser()
-   parser.add_argument("input_file",help="Input filename")
-   parser.add_argument("output_file",help="Output filename")
-   parser.add_argument("-s","--start",type=long,
-                     help="Starting sample index")
-   parser.add_argument("-n","--nsamps",type=long,help="# samples")
-   args = parser.parse_args()
-   # Build the flowgraph
-   tb = build_block (args)
-   # Execute
-   tb.run()
-if __name__=='__main__':
-   main ()
-
+    (options, args) = get_options()
+    # Parse input header
+    hdr_in = read_header(args[0])
+    # Build the flowgraph
+    tb = buildblock(options, args,hdr_in)
+    # Execute
+    tb.run()
+if __name__ == '__main__':
+    main()
 
