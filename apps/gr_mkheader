@@ -30,7 +30,7 @@ def update_timestamp(hdr,seg_size):
         r = pmt.dict_ref(hdr, pmt.intern("rx_rate"), pmt.PMT_NIL)
         rate = pmt.to_double(r)
         new_t = t + float(seg_size)/rate
-        new_secs = long(new_t%60.0)
+        new_secs = long(new_t)
         new_fracs = new_t - new_secs
         time_val = pmt.make_tuple(pmt.from_uint64(new_secs),
                              pmt.from_double(new_fracs))
@@ -119,27 +119,33 @@ def make_header(options, filename):
     else:
         start_val = pmt.from_uint64(blocks.METADATA_HEADER_SIZE)
     header = pmt.dict_add(header, pmt.intern("strt"), start_val)
-
-    # Write initial header
+    num_segments = file_samp_len/seg_size
+    if options.verbose:
+        print "Wrote %d headers to: %s (Version %d)" % (num_segments+1,
+                hdr_filename,pmt.to_long(ver_val))
+    for x in range(0,num_segments,1):
+        # Serialize and write out file
+        if extras_present:
+            header_str = pmt.serialize_str(header) + extras_str
+        else:
+            header_str = pmt.serialize_str(header)
+        hdr_file.write(header_str)
+        # Update header based on sample rate and segment size
+        header = update_timestamp(header,seg_size)
+    
+    # Last header is special b/c file size is probably not mult. of seg_size
+    header = pmt.dict_delete(header,pmt.intern("bytes"))
+    bytes_remaining = ft_to_sz[fmt]*(file_samp_len - num_segments*long(seg_size))
+    bytes_val = pmt.from_uint64(bytes_remaining)
+    header = pmt.dict_add(header,pmt.intern("bytes"),bytes_val)
+    # Serialize and write out file
     if extras_present:
         header_str = pmt.serialize_str(header) + extras_str
     else:
         header_str = pmt.serialize_str(header)
     hdr_file.write(header_str)
-    for x in range(0,file_samp_len-seg_size):
-        if x%seg_size == 0:
-            # Update header based on sample rate and segment size
-            header = update_timestamp(header,seg_size)
-            # Serialize and write out file
-            if extras_present:
-                header_str = pmt.serialize_str(header) + extras_str
-            else:
-                header_str = pmt.serialize_str(header)
-            hdr_file.write(header_str)
-    # Tell user what was written if verbose
-    if options.verbose:
-        print "Wrote Version " + repr(ver_val) + " header: " + hdr_filename 
-
+    hdr_file.close()
+    
 if __name__=='__main__':
     (options, filename) = get_options()
     make_header(options, filename)
