@@ -21,8 +21,9 @@
 #
 
 import sys
-from gnuradio import gr, blocks
+from gnuradio import gr, blocks, eng_notation
 import pmt
+from datetime import datetime
 
 '''
 sr    Sample rate (samples/second)
@@ -76,7 +77,7 @@ def parse_header(p, VERBOSE=False):
         samp_rate = pmt.to_double(r)
         info["rx_rate"] = samp_rate
         if(VERBOSE):
-            print "Sample Rate: {0:2.1e} sps".format(samp_rate)
+            print "Sample Rate: " + eng_notation.num_to_str(samp_rate) + "SPS"
 
     else:
         sys.stderr.write("Could not find key 'sr': invalid or corrupt data file.\n")
@@ -92,7 +93,9 @@ def parse_header(p, VERBOSE=False):
         t = secs + fracs
         info["rx_time"] = t
         if(VERBOSE):
-            print "Seconds: {0:.6f}".format(t)
+            time = datetime.fromtimestamp(t).strftime('%m/%d/%Y %H:%M:%S')
+            print "Timestamp: " + time
+            print "Linux Epoch: {0:.6f}".format(t) + " Seconds"
     else:
         sys.stderr.write("Could not find key 'time': invalid or corrupt data file.\n")
         sys.exit(1)
@@ -102,9 +105,8 @@ def parse_header(p, VERBOSE=False):
         r = pmt.dict_ref(p, pmt.string_to_symbol("size"), dump)
         dsize = pmt.to_long(r)
         info["size"] = dsize
-	print dsize
         if(VERBOSE):
-            print "Item size: {0}".format(dsize)
+            print "Item Size: " + eng_notation.num_to_str(dsize) + " Bytes"
     else:
         sys.stderr.write("Could not find key 'size': invalid or corrupt data file.\n")
         sys.exit(1)
@@ -117,7 +119,6 @@ def parse_header(p, VERBOSE=False):
         info["type"] = stype
         if(VERBOSE):
             print "Data Type: {0} ({1})".format(stype, dtype)
-	print dtype
     else:
         sys.stderr.write("Could not find key 'type': invalid or corrupt data file.\n")
         sys.exit(1)
@@ -186,8 +187,10 @@ def parse_header(p, VERBOSE=False):
         info["nbytes"] = nbytes
 	#info["types"] = types
         if(VERBOSE):
-            print "Size of Data: {0:2.1e} bytes".format(nbytes)
-            print "              {0:2.1e} items".format(nitems)
+            #print "Size of Data: {0:2.1e} bytes".format(nbytes)
+            print "Segment Size (bytes): " + eng_notation.num_to_str(nbytes) 
+            #print "              {0:2.1e} items".format(nitems)
+            print "Segment Size (items): " + eng_notation.num_to_str(nitems)
 
     else:
         sys.stderr.write("Could not find key 'size': invalid or corrupt data file.\n")
