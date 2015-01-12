@@ -1,59 +1,300 @@
 #!/usr/bin/python
 # Selects a subset of samples out of pre-recorded data
-# PWG 10.15.2014
+# Support for headers
 
 from gnuradio import gr
 from gnuradio import blocks
 from gnuradio.eng_option import eng_option
-from gnuradio import eng_notation
-
-import argparse
+from optparse import OptionParser
+from gnuradio.blocks import parse_file_metadata
+import pmt
+import sys
 import os
 
+# Defining Tuple for data types: (itemsize,cpx,format)
+SC16_DEFS = (gr.sizeof_short*2,True,blocks.GR_FILE_SHORT)
+FC32_DEFS = (gr.sizeof_gr_complex,True,blocks.GR_FILE_FLOAT)
+ENUM_TO_SNAME = {0:'unknown', 1:'sc16', 2:'fc32'}
+SNAME_DEFS = {1:SC16_DEFS, 2:FC32_DEFS}
+SNAME_TO_ENUM = {v: k for k, v in ENUM_TO_SNAME.items()}
+STRING_TO_FTYPE= {v: k for k, v in parse_file_metadata.ftype_to_string.items()}
 
-class build_block(gr.top_block):
-	def __init__(self,args):
-		gr.top_block.__init__(self)
-                ## Vars ##
-		sample_rate=25e6
-                num_secs=5;
-                #sample_len=long(sample_rate*1)
-                #sample_offset=long(sample_rate*num_secs);
-                sample_offset=long(args.start);
-                sample_len=long(args.nsamps);
-                infile=args.input_file
-                outfile=args.output_file
-                print 'Sample Offset:' + repr(sample_offset)
-                print 'Sample Length:' + repr(sample_len)
-                print 'Input File:' + infile
-                print 'Output File:' + outfile
-                ## Blocks ##
-		fsrc = blocks.file_source(gr.sizeof_short*1,infile,False)
-                # SEEK_SET is offset from beginning, sample_offset is in samples
-                fsrc.seek(sample_offset*2,os.SEEK_SET)
-                short_to_cpx = blocks.interleaved_short_to_complex(False,False)
+def get_options():
+    usage = "%prog: <input_file> <output_file>"
+    desc = "Selects a subsection of a recorded file with headers"
+    desc += "\n Assumes detached headers (for now)"
+    parser = OptionParser(usage=usage, description=desc,
+             option_class=eng_option)
+    parser.add_option("-S", "--start", type="eng_float", default=0,
+           help="Starting sample index.  Applies AFTER type conversion \
+           [default=%default]")
+    parser.add_option("-N", "--nsamples", type="eng_float", default=0,
+           help="Number of samples to output. If not specified, output all")
+    parser.add_option("-v", "--verbose", action="store_true", default=False,
+           help="Verbose Output")
+    parser.add_option("-t", "--output-type", type="choice", default="unknown",
+            choices=SNAME_TO_ENUM.keys(), help="Output data type. \
+                     [sc16|fc32] Default is same as input")
+                     
+    (options, args) = parser.parse_args()
+    if len(args) != 2:
+        parser.print_help()
+        raise SystemExit(1)
+    return (options, args)
+def read_header(infile):
+    filename = infile + '.hdr'
+    try:
+        handle = open(filename, "rb")
+    except IOError:
+        sys.stderr.write("Unable to open input file\n")
+        sys.exit(1)
+    header_str = handle.read(parse_file_metadata.HEADER_LENGTH)
+    if len(header_str) == 0:
+        sys.stderr.write("Header is empty\n")
+        sys.exit(1)
+    # String to PMT Conversion
+    try:
+        header = pmt.deserialize_str(header_str)
+    except RuntimeError:
+        sys.stderr.write("Can't deserialize header: invalid/corrupt data\n")
+        sys.exit(1)
+    return header
+
+def find_shortname(cpx, the_type, item_size):
+    shortname_type = SNAME_TO_ENUM["unknown"]
+    the_type = STRING_TO_FTYPE[the_type]
+    # Interleaved Short
+    if cmp(SNAME_DEFS[1], (item_size, cpx, the_type)) == 0:
+        return SNAME_TO_ENUM["sc16"]
+    # Complex Float
+    if cmp(SNAME_DEFS[2], (item_size, cpx, the_type)) == 0:
+        return SNAME_TO_ENUM["fc32"]
+    return shortname_type
+
+def write_out_hdr(hdr_in, options, outfile):
+    hdr_filename = outfile + '.hdr'
+    dump = pmt.PMT_NIL
+    try:
+        hdr_file = open(hdr_filename, 'wb')
+    except IOError:
+        sys.stderr.write("Can't Open output file\n")
+        sys.exit(1)
+    print hdr_in
+    print 'is dict?' + repr(pmt.is_dict(hdr_in))
+    if pmt.dict_has_key(hdr_in, pmt.intern("version")):
+        ver = pmt.dict_ref(hdr_in,pmt.intern("version"),dump)
+    if pmt.dict_has_key(hdr_in,pmt.intern("rx_rate")):
+        rx_rate = pmt.dict_ref(hdr_in,pmt.intern("rx_rate"),dump)
+
+    hdr_out = pmt.make_dict()
+    hdr_out = pmt.dict_add(hdr_out,pmt.intern("version"),ver)
+    hdr_out = pmt.dict_add(hdr_out,pmt.intern("rx_rate"),rx_rate)
+    hdr_out_str = pmt.serialize_str(hdr_out)
+    hdr_file.write(hdr_out_str)
+
+# Read a single header, return metadata dictionary
+def read_single_header(handle):
+    nread = handle.tell()
+    header_str = handle.read(parse_file_metadata.HEADER_LENGTH)
+    if len(header_str) == 0:
+        sys.stderr.write("Empty Header, quitting.\n")
+        sys.exit(1)
+    # Convert from string to PMT (should be a dictionary)
+    try:
+        header = pmt.deserialize_str(header_str)
+    except RuntimeError:
+        sys.stderr.write("Could not deserialize header: invalid or \
+                corrupt data file.\n")
+        sys.exit(1)
+    info = parse_file_metadata.parse_header(header, False)
+    extras_str = handle.read(info["extra_len"])
+    try:
+        extras_hdr = pmt.deserialize_str(extras_str)
+    except RuntimeError:
+        sys.stderr.write("Could not deserialize extras\n")
+        sys.exit(1)
+    nread += parse_file_metadata.HEADER_LENGTH + info["extra_len"]
+    handle.seek(nread, 0)
+    return header, extras_hdr, handle
+
+# Returns (infile,intype,outfile,outtype,sample_offset,sample_len)
+def propagate_headers(options,args):
+    infile = args[0]
+    outfile = args[1]
+    infile_hdr = infile + '.hdr'
+    outfile_hdr = outfile + '.hdr'
+    sample_cnt_end = 0
+    sample_offset = long(options.start)
+    sample_len = long(options.nsamples)
+    final_index = sample_offset + sample_len 
+    # Open input header
+    try:
+        handle_in = open(infile_hdr, "rb")
+    except IOError:
+        sys.stderr.write("Unable to open input file header\n")
+        sys.exit(1)
+    # Open output header
+    try:
+        handle_out = open(outfile_hdr, "wb")
+    except IOError:
+        sys.stderr.write("Unable to open output file header\n")
+        sys.exit(1)
+
+    # Read first header separately to get file type
+    hdr_in, hdr_extra_in, handle_in = read_single_header(handle_in)
+    info_in = parse_file_metadata.parse_header(hdr_in,False)
+    sample_cnt_end += info_in["nitems"]
+    # Parse file type - ensure support for it
+    shortname_intype = find_shortname(info_in['cplx'], info_in['type'],
+                info_in['size'])
+    if shortname_intype == SNAME_TO_ENUM["unknown"]:
+        sys.stderr.write("Unsupported data type\n")
+        sys.exit(1)
+    if options.output_type == 'unknown':
+        shortname_outtype = shortname_intype
+    else:
+        shortname_outtype = SNAME_TO_ENUM[options.output_type]
+        # Search input headers until we find the correct one
+    while sample_cnt_end <= sample_offset:
+        hdr_in, hdr_extra_in, handle_in = read_single_header(handle_in)
+        info_in = parse_file_metadata.parse_header(hdr_in,False)
+        sample_cnt_end += info_in["nitems"]
+    time_in = info_in["rx_time"]
+    # Starting sample of current segment
+    sample_cnt_start = sample_cnt_end - info_in["nitems"]
+    # Interpolate new timestamp
+    delta = sample_offset - sample_cnt_start
+    new_ts = time_in + delta/info_in["rx_rate"]
+    # Calc new segment size (samples)
+    if sample_cnt_end > final_index:
+        first_seg_len = final_index - sample_offset
+    else:
+        first_seg_len = sample_cnt_end - sample_offset
+    
+    # Write the first output header
+    hdr_out = hdr_in
+    new_secs = long(new_ts)
+    new_fracs = new_ts - new_secs
+    time_val = pmt.make_tuple(pmt.from_uint64(new_secs),
+            pmt.from_double(new_fracs))
+    size_val = pmt.from_long(SNAME_DEFS[shortname_outtype][0])
+    bytes_val = pmt.from_uint64(first_seg_len*SNAME_DEFS[shortname_outtype][0])
+    type_val = pmt.from_long(SNAME_DEFS[shortname_outtype][2])
+    hdr_out = pmt.dict_add(hdr_out, pmt.intern("rx_time"), time_val)
+    hdr_out = pmt.dict_add(hdr_out, pmt.intern("bytes"), bytes_val)
+    hdr_out = pmt.dict_add(hdr_out, pmt.intern("type"), type_val)
+    hdr_out = pmt.dict_add(hdr_out, pmt.intern("size"), size_val)
+    hdr_out_str = pmt.serialize_str(hdr_out) + pmt.serialize_str(hdr_extra_in)    
+    handle_out.write(hdr_out_str)
+
+    # Continue reading headers, modifying, and writing 
+    last_seg_len = info_in['nitems']
+    print "sample_cnt_end=%d,final_index=%d" % (sample_cnt_end,final_index)
+    # Iterate through remaining headers
+    while sample_cnt_end < final_index:
+        hdr_in, hdr_extra_in, handle_in = read_single_header(handle_in)
+        info_in = parse_file_metadata.parse_header(hdr_in,False)
+        nitems = info_in["nitems"]
+        sample_cnt_start = sample_cnt_end
+        sample_cnt_end += nitems
+        hdr_out = hdr_in
+        # For last header, adjust segment length accordingly
+        if sample_cnt_end > final_index:
+            last_seg_len = final_index - sample_cnt_start
+        else:
+            last_seg_len = nitems
+        size_val = pmt.from_long(SNAME_DEFS[shortname_outtype][0])
+        bytes_val = pmt.from_uint64(last_seg_len*SNAME_DEFS[shortname_outtype][0])
+        type_val = pmt.from_long(SNAME_DEFS[shortname_outtype][2])
+        hdr_out = pmt.dict_add(hdr_out, pmt.intern("bytes"), bytes_val)
+        hdr_out = pmt.dict_add(hdr_out, pmt.intern("type"), type_val)
+        hdr_out = pmt.dict_add(hdr_out, pmt.intern("size"), size_val)
+        hdr_out_str = pmt.serialize_str(hdr_out) + pmt.serialize_str(hdr_extra_in)
+        handle_out.write(hdr_out_str)
+        
+    if options.verbose:
+        print 'Input File:' + infile
+        print 'Input Header:' + infile_hdr
+        print 'Input Type:' + ENUM_TO_SNAME[shortname_intype]
+        print 'Output File:' + outfile
+        print 'Output File Length (Samples):%d' % (final_index-sample_offset)
+        print 'Output Header:' + outfile_hdr
+        print 'File subsection: [%d,%d]' % (sample_offset,final_index)
+        print 'Output Type:' + ENUM_TO_SNAME[shortname_outtype]
+        print 'First Segment Length: %e samples' % first_seg_len
+        print 'Last Segment Length: %e samples' % last_seg_len
+        print 'delta=%f,new ts=%f' % (delta,new_ts)
+
+    # Clean up
+    handle_in.close()
+    handle_out.close()
+
+    # Return header info
+    return {'infile':infile,'intype':shortname_intype,'outfile':outfile,
+            'outtype':shortname_outtype,'sample_offset':sample_offset,
+            'sample_len':sample_len}
+
+class buildblock(gr.top_block):
+    def __init__(self,config):
+        gr.top_block.__init__(self)
+        ## Vars ##
+        output_all = False
+        if config['sample_len'] == 0:
+            output_all = True
+        ## Interleaved Short input (sc16)
+        if config['intype'] == SNAME_TO_ENUM['sc16']:
+            fsrc = blocks.file_source(gr.sizeof_short*1,config['infile'], False)
+            # SEEK_SET is offset from beginning, sample_offset is in samples
+            # Factor of 2 because vector of length 2 (since interleaved)
+            fsrc.seek(config['sample_offset']*2, os.SEEK_SET)
+            # sc16->fc32
+            if config['outtype'] == SNAME_TO_ENUM['fc32']:
+                ishort_to_cpxfloat = blocks.interleaved_short_to_complex(False, False)
                 # Copies sample_len then exits
-                head = blocks.head(gr.sizeof_gr_complex*1,sample_len)
-                #skip_head = blocks.skiphead(gr.sizeof_gr_complex*1,sample_offset)
-                fsink = blocks.file_sink(gr.sizeof_gr_complex*1,outfile)
-                #throttle = blocks.throttle(gr.sizeof_gr_complex*1,sample_rate,True)
-                ## Connect Blocks
-                self.connect(fsrc,short_to_cpx,head,fsink)
-		#self.connect(src0, (dst,0))
-		#self.connect(src1, (dst,1))
-def main ():
-   parser = argparse.ArgumentParser()
-   parser.add_argument("input_file",help="Input filename")
-   parser.add_argument("output_file",help="Output filename")
-   parser.add_argument("-s","--start",type=long,
-                     help="Starting sample index")
-   parser.add_argument("-n","--nsamps",type=long,help="# samples")
-   args = parser.parse_args()
-   # Build the flowgraph
-   tb = build_block (args)
-   # Execute
-   tb.run()
-if __name__=='__main__':
-   main ()
-
+                head = blocks.head(gr.sizeof_gr_complex*1, config['sample_len'])
+                fsink = blocks.file_sink(gr.sizeof_gr_complex*1, config['outfile'])
+                if output_all:
+                    self.connect(fsrc, ishort_to_cpxfloat, fsink)
+                else:
+                    self.connect(fsrc, ishort_to_cpxfloat, head, fsink)
+            # sc16->sc16
+            elif config['outtype'] == SNAME_TO_ENUM['sc16']:
+                head = blocks.head(gr.sizeof_short, config['sample_len'])
+                fsink = blocks.file_sink(gr.sizeof_short, config['outfile'])
+                if output_all:
+                    self.connect(fsrc, fsink)
+                else:
+                    self.connect(fsrc, head, fsink)
+        ## Complex float input (fc32)
+        elif config['intype'] == SNAME_TO_ENUM['fc32']:
+            fsrc = blocks.file_source(gr.sizeof_gr_complex*1, config['infile'], False)
+            # SEEK_SET is offset from beginning, sample_offset is in samples
+            fsrc.seek(config['sample_offset'], os.SEEK_SET)
+            # fc32->fc32
+            if config['outtype'] == SNAME_TO_ENUM['fc32']:
+                head = blocks.head(gr.sizeof_gr_complex*1, config['sample_len'])
+                fsink = blocks.file_sink(gr.sizeof_gr_complex*1, config['outfile'])
+                if output_all:
+                    self.connect(fsrc, fsink)
+                else:
+                    self.connect(fsrc, head, fsink)
+            # fc32->sc16
+            elif config['outtype'] == SNAME_TO_ENUM['sc16']:
+                cpxfloat_to_ishort = blocks.complex_to_interleaved_short(False)
+                head = blocks.head(gr.sizeof_short, config['sample_len'])
+                fsink = blocks.file_sink(gr.sizeof_short, config['outfile'])
+                if output_all:
+                    self.connect(fsrc,cpxfloat_to_ishort,fsink)
+                else:
+                    self.connect(fsrc, cpxfloat_to_ishort, head, fsink)
+def main (options,args):
+    # Propagate and update header. Return flowgraph config
+    the_config = propagate_headers(options,args)
+    # Build the flowgraph
+    tb = buildblock(the_config)
+    # Execute
+    tb.run()
+if __name__ == '__main__':
+    (options, args) = get_options()
+    main(options,args)
 
