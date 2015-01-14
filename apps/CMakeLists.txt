@@ -22,7 +22,7 @@ include(GrPython)
 GR_PYTHON_INSTALL(
     PROGRAMS
     gr_mkheader
-    gr_fileconv
     gr_filetrunc
+    read_file_metadata
     DESTINATION ${GR_RUNTIME_DIR}
 )

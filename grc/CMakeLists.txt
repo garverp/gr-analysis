@@ -18,7 +18,14 @@
 # Boston, MA 02110-1301, USA.
 
 install(FILES
-    analysis_file_meta_sink.xml
-    analysis_file_meta_sink.xml
-    analysis_file_meta_sink.xml DESTINATION share/gnuradio/grc/blocks
+    #
+    #
+    #analysis_file_meta_sink.xml
+    #
+    #
+    #analysis_file_meta_sink.xml
+    #
+    #
+    #analysis_file_meta_sink.xml
+    DESTINATION share/gnuradio/grc/blocks
 )

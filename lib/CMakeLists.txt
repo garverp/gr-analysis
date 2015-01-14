@@ -26,10 +26,16 @@ include_directories(${Boost_INCLUDE_DIR})
 link_directories(${Boost_LIBRARY_DIRS})
 
 list(APPEND analysis_sources
-    file_meta_sink_impl.cc
-    file_meta_sink_impl.cc
-    file_meta_sink_impl.cc
-)
+    #
+    #
+    #file_meta_sink_impl.cc
+    #
+    #
+    #file_meta_sink_impl.cc
+    #
+    #
+    #file_meta_sink_impl.cc
+    )
 
 set(analysis_sources "${analysis_sources}" PARENT_SCOPE)
 if(NOT analysis_sources)
