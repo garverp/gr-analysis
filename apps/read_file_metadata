@@ -24,7 +24,8 @@ import sys
 from optparse import OptionParser
 
 import pmt
-import parse_file_metadata_local
+from analysis import parse_file_metadata_local
+from gnuradio import eng_notation
 
 def main(filename, detached=False):
     handle = open(filename, "rb")
@@ -50,8 +51,9 @@ def main(filename, detached=False):
         info = parse_file_metadata_local.parse_header(header, True)
         deltat = info["nitems"]/info["rx_rate"]
         totaltime = totaltime + deltat
-        print "Time in this chunk: {0:.6f}".format(deltat)
-        print "Total Time elapsed: {0:.6f}".format(totaltime)
+        #print "Time in this chunk: {0:.6f}".format(deltat)
+        print "Chunk Time: " + eng_notation.num_to_str(deltat) + "S"
+        print "Total Time elapsed: " + eng_notation.num_to_str(totaltime) + "S"
 
         if(info["extra_len"] > 0):
             extra_str = handle.read(info["extra_len"])

@@ -31,6 +31,7 @@ endif()
 GR_PYTHON_INSTALL(
     FILES
     __init__.py
+    parse_file_metadata_local.py
     DESTINATION ${GR_PYTHON_DIR}/analysis
 )
 
