@@ -14,8 +14,9 @@ import os
 # Defining Tuple for data types: (itemsize,cpx,format)
 SC16_DEFS = (gr.sizeof_short*2,True,blocks.GR_FILE_SHORT)
 FC32_DEFS = (gr.sizeof_gr_complex,True,blocks.GR_FILE_FLOAT)
-ENUM_TO_SNAME = {0:'unknown', 1:'sc16', 2:'fc32'}
-SNAME_DEFS = {1:SC16_DEFS, 2:FC32_DEFS}
+B8_DEFS = (gr.sizeof_char,False,blocks.GR_FILE_BYTE)
+ENUM_TO_SNAME = {0:'unknown', 1:'sc16', 2:'fc32', 3:'b8'}
+SNAME_DEFS = {1:SC16_DEFS, 2:FC32_DEFS, 3:B8_DEFS}
 SNAME_TO_ENUM = {v: k for k, v in ENUM_TO_SNAME.items()}
 STRING_TO_FTYPE= {v: k for k, v in parse_file_metadata.ftype_to_string.items()}
 
@@ -51,6 +52,9 @@ def find_shortname(cpx, the_type, item_size):
     # Complex Float
     if cmp(SNAME_DEFS[2], (item_size, cpx, the_type)) == 0:
         return SNAME_TO_ENUM["fc32"]
+    # Bytes
+    if cmp(SNAME_DEFS[3], (item_size, cpx, the_type)) == 0:
+        return SNAME_TO_ENUM["b8"]
     return shortname_type
 
 # Read a single header, return metadata dictionary
@@ -249,4 +253,3 @@ def main (options,args):
 if __name__ == '__main__':
     (options, args) = get_options()
     main(options,args)
-
