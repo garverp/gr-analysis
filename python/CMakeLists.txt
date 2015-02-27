@@ -32,6 +32,9 @@ GR_PYTHON_INSTALL(
     FILES
     __init__.py
     parse_file_metadata_local.py
+    filetrunc.py
+    mkheader.py
+    metafileread.py
     DESTINATION ${GR_PYTHON_DIR}/analysis
 )
 
