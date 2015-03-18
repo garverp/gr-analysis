@@ -19,6 +19,10 @@
 
 include(GrPython)
 
+add_subdirectory(record)
+add_subdirectory(matlab)
+
+
 GR_PYTHON_INSTALL(
     PROGRAMS
     gr_mkheader
