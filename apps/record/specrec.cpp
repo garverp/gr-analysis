@@ -1,4 +1,3 @@
-//
 // Copyright 2010-2011,2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
@@ -58,7 +57,7 @@ uhd::atomic_uint32_t num_elements;
 void sig_int_handler(int){ done = true; }
 
 void usrp_write_samples_to_file(int fd, 
-		uhd::transport::bounded_buffer<circbuff_element_t>* cb){
+		uhd::transport::bounded_buffer<circbuff_element_t>* cb, bool detachhdr){
 	int bytes_written = 0;
 	circbuff_element_t write_ele;
 	while (!done){
@@ -66,9 +65,9 @@ void usrp_write_samples_to_file(int fd,
 		cb->pop_with_wait(write_ele); 
 		bytes_written = write(fd,(void*)&write_ele,CB_ELEMENT_SIZE);
 		// Using lock to avoid collisions with in file metadata writing.
-		pthread_mutex_lock(&mtx);
+		if(!detachhdr){pthread_mutex_lock(&mtx);}
 		sync_file_range(fd,0,0,SYNC_FILE_RANGE_WRITE);
-		pthread_mutex_unlock(&mtx); 
+		if(!detachhdr){pthread_mutex_unlock(&mtx);} 
 		if( bytes_written != CB_ELEMENT_SIZE ){
 			if( bytes_written < 0 ){
 				printf("Problem writing: %s\n",strerror(errno));
@@ -131,7 +130,7 @@ std::string create_metadata_header( double samp_rate, double freq, double gain, 
 	return hdr_str + ext_str;
 }
 
-void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t timestamp, unsigned long long segment_samps_size) {
+void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t timestamp, unsigned long long segment_samps_size, bool detachhdr) {
 
 	// METADATA - write one header at beginning of file
 	char header[METADATA_HEADER_SIZE];
@@ -142,17 +141,18 @@ void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t t
 	header_str = create_metadata_header( usrp->get_rx_rate(), usrp->get_rx_freq(), usrp->get_rx_gain(), timestamp, segment_samps_size);
 	//std::cout << std::endl << header_str.size() <<std::endl;
 	// Using lock to avoid collisions with sample writing.
-	pthread_mutex_lock(&mtx);
+        if(!detachhdr){	pthread_mutex_lock(&mtx);}
 	write(fd,header_str.c_str(),header_str.size());
-	pthread_mutex_unlock(&mtx); 
+        if(!detachhdr){pthread_mutex_unlock(&mtx);}
 }
 
 void write_seg_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::rx_metadata_t *md,
-		unsigned long long * num_total_samps, unsigned long long segment_samps_size) {
+		unsigned long long * num_total_samps, unsigned long long segment_samps_size, bool detachhdr) {
+
 	int counter = 1;
 	while(!done) {
 		if(*num_total_samps >= counter*segment_samps_size){
-            		write_metadata(fd,usrp, md->time_spec, segment_samps_size);
+            		write_metadata(fd,usrp, md->time_spec, segment_samps_size, detachhdr);
 			counter++;
 			//std::cout << timestamp; 
 		} else {
@@ -162,7 +162,7 @@ void write_seg_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::rx_metada
 
 	//write leftover samples metadata which has size less than segment divition size
 	if(*num_total_samps > 0) {
-		write_metadata(fd,usrp, md->time_spec, *num_total_samps%segment_samps_size);
+		write_metadata(fd,usrp, md->time_spec, *num_total_samps%segment_samps_size, detachhdr);
 	}
 	
 }
@@ -171,9 +171,9 @@ void metadata_handle(int fd, int fd_hdr, bool metadata, bool detachhdr, uhd::usr
 		unsigned long long * num_total_samps, unsigned long long segment_samps_size, uhd::rx_metadata_t *md) {
 	if(metadata) {
 		if(detachhdr){
-			write_seg_metadata(fd_hdr, usrp, md, num_total_samps, segment_samps_size);
+			write_seg_metadata(fd_hdr, usrp, md, num_total_samps, segment_samps_size, detachhdr);
 		} else {
-			write_seg_metadata(fd, usrp, md, num_total_samps, segment_samps_size);
+			write_seg_metadata(fd, usrp, md, num_total_samps, segment_samps_size, detachhdr);
 		}	
 	}
 }
@@ -259,7 +259,7 @@ template<typename samp_type> void recv_to_file(
 	
 	typedef std::map<size_t,size_t> SizeMap;
 	SizeMap mapSizes;
-	boost::thread write_thread(usrp_write_samples_to_file,fd,&buff);
+	boost::thread write_thread(usrp_write_samples_to_file,fd,&buff,detachhdr);
 	while(not done and (num_requested_samples != num_total_samps 
 				or num_requested_samples == 0)){
 		boost::system_time now = boost::get_system_time();
@@ -339,6 +339,7 @@ template<typename samp_type> void recv_to_file(
 
 	}
 	done = true;
+        pthread_cond_signal(&cond);
 	// Wait for thread to exit
 	write_thread.join();
 	metadata_handle_thread.join(); 
@@ -429,7 +430,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 		("type", po::value<std::string>(&type)->default_value("short"), "sample type: double, float, or short")
 		("nsamps", po::value<size_t>(&total_num_samps)->default_value(0), "total number of samples to receive")
 		("time", po::value<double>(&total_time)->default_value(0), "total number of seconds to receive")
-		("cbcapacity", po::value<size_t>(&cbcapacity)->default_value(1024), "Elements per Circular Buffer")
+		("cbcapacity", po::value<size_t>(&cbcapacity)->default_value(4096), "Elements per Circular Buffer")
 		("rate", po::value<double>(&rate)->default_value(1e6), "rate of incoming samples")
 		("freq", po::value<double>(&freq)->default_value(0.0), "RF center frequency in Hz")
 		("gain", po::value<double>(&gain), "gain for the RF chain")
