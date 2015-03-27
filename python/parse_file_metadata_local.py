@@ -136,7 +136,7 @@ def parse_header(p, VERBOSE=False):
 	#print cplx
 	#print dtype
 	#print dsize
-    	if(cplx==False):
+    if(cplx==False):
 		if(dtype==0):
 			tsize=1
 		elif(dtype==1):
@@ -158,10 +158,10 @@ def parse_header(p, VERBOSE=False):
 			print "The data is a vector containing {0} elements.".format(vecchk)
     		else:
 			print "The data is not a vector."
-    else:
+    '''else:
         sys.stderr.write("Could not find key 'cplx': invalid or corrupt data file.\n")
         sys.exit(1)
-		
+		'''
     # EXTRACT WHERE CURRENT SEGMENT STARTS
     if(pmt.dict_has_key(p, pmt.string_to_symbol("strt"))):
         r = pmt.dict_ref(p, pmt.string_to_symbol("strt"), dump)
