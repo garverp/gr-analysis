@@ -75,71 +75,14 @@ def make_header(options, filename):
     rate_val = pmt.from_double(options.sample_rate)
     time_val = pmt.make_tuple(pmt.from_uint64(options.time_sec),
                              pmt.from_double(options.time_fsec))
-    #samp_num = rate_val*time_val
     ft_to_sz = parse_file_metadata.ftype_to_size
-    #print ft_to_sz
-    ft_to_str = parse_file_metadata.ftype_to_string
-    #print ft_to_str
-
-    # Interpret the size
-    if options.format=='b8':
-        fmt = blocks.GR_FILE_BYTE
-        #cplx=False
-        cplx_val = pmt.from_bool(False)
-        size_val = pmt.from_long(ft_to_sz[fmt])
-        type_val = pmt.from_long(fmt)
-        #size_val = 8
-    elif options.format=='sc16':
-        fmt = blocks.GR_FILE_SHORT
-        #cplx=True
-        cplx_val = pmt.from_bool(True)
-        size = 4
-        size_val = pmt.from_long(size)
-        type_val = pmt.from_long(fmt)
-        #size_val = 32
-    elif options.format == 'fc32':
-        fmt = blocks.GR_FILE_FLOAT
-        #cplx=True
-        cplx_val = pmt.from_bool(True)
-        size = 8
-        size_val = pmt.from_long(size)
-        type_val = pmt.from_long(fmt)
-        #size_val = 64
-    else:
-        print "Invalid format"
-    
-    #print cplx_val
-    """
-    ft_to_sz = parse_file_metadata.ftype_to_size
-    size_val = pmt.from_long(ft_to_sz[fmt])
-    if cplx_val==True:
-        ft_to_sz=2*ft_to_sz
-        size_val = pmt.from_long(ft_to_sz[fmt])
-    """
-    #size_val=pmt_fr
-   
-    """
-    ft_to_sz = parse_file_metadata.ftype_to_size
-    ft_to_str = parse_file_metadata.ftype_to_string
-    print ft_to_str
-    fmt = [fmt for fmt, value in ft_to_str.items() if value == options.format][0]
-    size_val = pmt.from_long(ft_to_sz[fmt])
-    type_val = pmt.from_long(fmt)
-    cplx_val = True
-    #cplx_val = pmt.from_bool(not options.real)
-    if options.format=='b8':
-        cplx_val = False
-    """
-    #if not options.real:
-    """     
-    if cplx_val == True:  
-    ft_to_sz[fmt] = 2*ft_to_sz[fmt]
-    size_val = pmt.from_long(ft_to_sz[fmt])
-    """
-    #cplx_val = pmt.from_bool(cplx)
-    samp_len = long(options.length*ft_to_sz[fmt])
-    bytes_val = pmt.from_uint64(samp_len)
-    bytes_val_int = pmt.to_python(bytes_val)
+    # Map shortname to properties
+    enum_type = SNAME_TO_ENUM[options.format]
+    type_props = SNAME_DEFS[enum_type]
+    size_val = pmt.from_long(type_props[0])
+    cplx_val = pmt.from_bool(type_props[1])
+    type_val = pmt.from_long(type_props[2])
+    fmt = type_props[2]
     file_samp_len = long(options.length)
     seg_size = long(options.seg_size)
     bytes_val = pmt.from_uint64(long(seg_size*ft_to_sz[fmt]))
