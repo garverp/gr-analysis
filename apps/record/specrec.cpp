@@ -38,7 +38,7 @@
 //pthread lib
 #include <pthread.h>
 //int create_metadata_header(char * header, double samp_rate, double freq, double gain);
-std::string create_metadata_header( double samp_rate, double freq, double gain, uhd::time_spec_t timestamp, unsigned long long segment_samps_size);
+std::string create_metadata_header( double samp_rate, double freq, double gain, uhd::time_spec_t timestamp, unsigned long long segment_samps_size, unsigned long long item_num);
 #define METADATA_HEADER_SIZE 149
 #define CB_ELEMENT_SIZE 4096
 
@@ -104,13 +104,15 @@ std::cout << hdr_str;
 std::strcpy (headerC, hdr_str.c_str());
 return headerSize;
 }*/
-std::string create_metadata_header( double samp_rate, double freq, double gain, uhd::time_spec_t timestamp,unsigned long long segment_samps_size) {
+std::string create_metadata_header( double samp_rate, double freq, double gain, uhd::time_spec_t timestamp,unsigned long long segment_samps_size, unsigned long long item_num) {
 	// use GNU Radio's PMT methods to construct the header	
 	const char METADATA_VERSION = 0x0;
 	int headerSize;  
 	pmt::pmt_t extras;
 	extras = pmt::make_dict();
 	extras = pmt::dict_add(extras, pmt::mp("rx_freq"), pmt::mp(freq));
+	//item_num specify the order of each segment metadata
+        extras = pmt::dict_add(extras, pmt::mp("item_num"), pmt::from_uint64(item_num));
 	std::string ext_str = pmt::serialize_str(extras);
 
 	pmt::pmt_t header;
@@ -125,12 +127,13 @@ std::string create_metadata_header( double samp_rate, double freq, double gain, 
 	header = pmt::dict_add(header, pmt::mp("bytes"), pmt::from_uint64(4*segment_samps_size));
 	header = pmt::dict_add(header, pmt::mp("strt"), pmt::from_uint64(METADATA_HEADER_SIZE+ext_str.size()));
 
+
 	std::string hdr_str = pmt::serialize_str(header);
 //	std::cout << hdr_str + ext_str;
 	return hdr_str + ext_str;
 }
 
-void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t timestamp, unsigned long long segment_samps_size, bool detachhdr) {
+void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t timestamp, unsigned long long segment_samps_size, bool detachhdr, unsigned long long item_num) {
 
 	// METADATA - write one header at beginning of file
 	char header[METADATA_HEADER_SIZE];
@@ -138,7 +141,7 @@ void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t t
 	std::string header_str;
 	//uhd::time_spec_t timestamp = uhd::time_spec_t::get_system_time(); 
 	// can record metadata straight from USRP
-	header_str = create_metadata_header( usrp->get_rx_rate(), usrp->get_rx_freq(), usrp->get_rx_gain(), timestamp, segment_samps_size);
+	header_str = create_metadata_header( usrp->get_rx_rate(), usrp->get_rx_freq(), usrp->get_rx_gain(), timestamp, segment_samps_size, item_num);
 	//std::cout << std::endl << header_str.size() <<std::endl;
 	// Using lock to avoid collisions with sample writing.
         if(!detachhdr){	pthread_mutex_lock(&mtx);}
@@ -149,11 +152,11 @@ void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t t
 void write_seg_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::rx_metadata_t *md,
 		unsigned long long * num_total_samps, unsigned long long segment_samps_size, bool detachhdr) {
 
-	int counter = 1;
+	unsigned long long item_num = 1;
 	while(!done) {
-		if(*num_total_samps >= counter*segment_samps_size){
-            		write_metadata(fd,usrp, md->time_spec, segment_samps_size, detachhdr);
-			counter++;
+		if(*num_total_samps >= item_num*segment_samps_size){
+            		write_metadata(fd,usrp, md->time_spec, segment_samps_size, detachhdr, item_num);
+			item_num++;
 			//std::cout << timestamp; 
 		} else {
 			pthread_cond_wait(&cond, &mtx);
@@ -162,7 +165,7 @@ void write_seg_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::rx_metada
 
 	//write leftover samples metadata which has size less than segment divition size
 	if(*num_total_samps > 0) {
-		write_metadata(fd,usrp, md->time_spec, *num_total_samps%segment_samps_size, detachhdr);
+		write_metadata(fd,usrp, md->time_spec, *num_total_samps%segment_samps_size, detachhdr, item_num);
 	}
 	
 }
@@ -311,7 +314,7 @@ template<typename samp_type> void recv_to_file(
 		}
 		
 		//If segment metadata specified, check segment sample size
-		int counter = 1;
+		unsigned long long counter = 1;
 		if(num_total_samps >= segsize*counter) {
 			counter++;
 			pthread_cond_signal(&cond);
