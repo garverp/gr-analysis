@@ -152,11 +152,14 @@ void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t t
 void write_seg_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::rx_metadata_t *md,
 		unsigned long long * num_total_samps, unsigned long long segment_samps_size, bool detachhdr) {
 
-	unsigned long long item_num = 1;
+	int counter = 1;
+	unsigned long long item_num = 0;;
 	while(!done) {
-		if(*num_total_samps >= item_num*segment_samps_size){
+		if(*num_total_samps >= counter*segment_samps_size){
+			//The first sample number in each segment.
+			item_num = (counter-1)*segment_samps_size;
             		write_metadata(fd,usrp, md->time_spec, segment_samps_size, detachhdr, item_num);
-			item_num++;
+			counter++;
 			//std::cout << timestamp; 
 		} else {
 			pthread_cond_wait(&cond, &mtx);
