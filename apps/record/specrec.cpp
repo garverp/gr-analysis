@@ -543,10 +543,11 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 	}
 
 	// Set the computer time onto the USRP
-	std::time_t currentTimeSec = std::time(NULL);
-	std::cout << "Current time: "<<currentTimeSec <<std::endl;
-	uhd::time_spec_t currentTime(currentTimeSec);
-	usrp->set_time_now(currentTime);
+        std::time_t currentTimeSec = std::time(NULL);
+        std::cout << "Current time: "<<currentTimeSec <<std::endl;
+        uhd::time_spec_t currentTime(currentTimeSec);
+        usrp->set_time_now(currentTime);
+
 
 	if (total_num_samps == 0){
 		std::signal(SIGINT, &sig_int_handler);
