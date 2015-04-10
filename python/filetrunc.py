@@ -217,9 +217,9 @@ class buildblock(gr.top_block):
             # fc32->sc16
             elif config['outtype'] == SNAME_TO_ENUM['sc16']:
                 cpxfloat_to_ishort = blocks.complex_to_interleaved_short(False)
-                head = blocks.head(gr.sizeof_short, config['sample_len'])
+                head = blocks.head(gr.sizeof_gr_complex*1, config['sample_len'])
                 fsink = blocks.file_sink(gr.sizeof_short, config['outfile'])
-                self.connect(fsrc, cpxfloat_to_ishort, head, fsink)
+                self.connect(fsrc, head,cpxfloat_to_ishort,fsink)
 
 def truncate_file(options,args):
     #Propagate and update header. Return flowgraph config.
