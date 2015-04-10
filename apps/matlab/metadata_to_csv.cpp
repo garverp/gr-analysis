@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
             pmt::pmt_t r = pmt::dict_ref(hdr, pmt::string_to_symbol("strt"), pmt::PMT_NIL);
             uint64_t seg_start = pmt::to_uint64(r);
             uint64_t extra_len = seg_start - METADATA_HEADER_SIZE;
-            //std::cout << "extra_len " << extra_len << " \n";
+            std::cout << "extra_len " << extra_len << " \n";
             pmt::pmt_t pversion = pmt::dict_ref(hdr, pmt::string_to_symbol("version"), pmt::PMT_NIL);
                //string version = pmt::symbol_to_string(pversion);
                //std::cout << "version " << version << " \n";
@@ -115,18 +115,28 @@ int main(int argc, char *argv[])
                   rx_freq = pmt::to_double(prx_freq);
                   std::cout << "rx_freq (Hz) " << rx_freq << " \n";
                }
+		uint64_t Item_num=0;
+		if(pmt::dict_has_key(hdr_extra, pmt::string_to_symbol("Item_num"))) {
+                  pmt::pmt_t pItem_num = pmt::dict_ref(hdr_extra, pmt::string_to_symbol("Item_num"), pmt::PMT_NIL);
+                  Item_num = pmt::to_uint64(pItem_num);
+                  std::cout << "Item_num (sample_num) " << Item_num << " \n";
+               }
                std::cout << " \n";
 
             uint64_t numElements = bytes/(uint64_t)size;
             double samplingPeriod = 1/rx_freq;
             if(checkFirstEntry){
-               csvOut << tsecs << ","<< tfrac << "," << numElements << "," << rx_freq << "," << rx_rate << "\n";
+		csvOut << "rx_rate" << "," <<"rx_tsecs" << "," <<"rx_tfrac" << "," << "size" << "," << "type" << "," << "cplx" 
+			<< "," << "strt" << "," << "bytes" << "," << "rx_freq" << "," << "Item_num" << "\n";
+		csvOut << rx_rate << "," << tsecs << "," << tfrac << "," << size << "," << type << "," << cplx
+			<< "," << strt << "," << bytes << "," << rx_freq << "," << Item_num << "\n";
                checkFirstEntry=false;
             }
             else{
                metadata_rowCounter++;
                rx_time+=samplingPeriod;
-               csvOut << tsecs << ","<< tfrac << "," << numElements << "," << rx_freq << "," << rx_rate << "\n";
+               csvOut << rx_rate << "," << tsecs << "," << tfrac << "," << size << "," << type << "," << cplx
+			<< "," << strt << "," << bytes << "," << rx_freq << "," << Item_num << "\n";
             }
             n=n+METADATA_HEADER_SIZE + extra_len;
          }
