@@ -37,6 +37,9 @@
 #include <pmt/pmt.h>
 //pthread lib
 #include <pthread.h>
+//for utc time converting
+#include <time.h>
+
 //int create_metadata_header(char * header, double samp_rate, double freq, double gain);
 std::string create_metadata_header( double samp_rate, double freq, double gain, uhd::time_spec_t timestamp, unsigned long long segment_samps_size, unsigned long long item_num);
 #define METADATA_HEADER_SIZE 149
@@ -184,11 +187,21 @@ void metadata_handle(int fd, int fd_hdr, bool metadata, bool detachhdr, uhd::usr
 	}
 }
 
+
+uhd::time_spec_t UTC_to_spec_t(const char *buffer){
+	struct tm newtime = {0};
+	strptime(buffer, "%F %H:%M:%S %z", &newtime);
+	std::time_t std_time = mktime(&newtime);
+	uhd::time_spec_t usrp_time = uhd::time_spec_t(std_time,0);
+	return usrp_time;
+}
+
 template<typename samp_type> void recv_to_file(
 		uhd::usrp::multi_usrp::sptr usrp,
 		const std::string &cpu_format,
 		const std::string &wire_format,
 		const std::string &file,
+	        const std::string &start_time,
 		size_t cbcapacity,
 		unsigned long long num_requested_samples,
 		unsigned long long segsize, 
@@ -246,8 +259,22 @@ template<typename samp_type> void recv_to_file(
 			uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE
 			);
 	stream_cmd.num_samps = num_requested_samples;
-	stream_cmd.stream_now = true;
-	stream_cmd.time_spec = uhd::time_spec_t();
+	stream_cmd.stream_now = false;
+	
+
+	if(start_time.compare("0") ==0) {
+		//Default starting time is now
+		stream_cmd.stream_now = true;
+		stream_cmd.time_spec = uhd::time_spec_t();
+	} else {
+		//Set up starting time for streaming
+		uhd::time_spec_t usrp_time = UTC_to_spec_t(start_time.data());
+		stream_cmd.time_spec = usrp_time;
+	}
+	
+
+
+
 	rx_stream->issue_stream_cmd(stream_cmd);
 	boost::system_time start = boost::get_system_time();
 	unsigned long long ticks_requested = 
@@ -422,7 +449,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 	uhd::set_thread_priority_safe();
 
 	//variables to be set by po
-	std::string args, file, type, ant, subdev, ref, wirefmt;
+	std::string args, file, type, ant, subdev, ref, wirefmt, start_time;
 	size_t total_num_samps, cbcapacity, segsize;
 	double rate, freq, gain, bw, total_time, setup_time;
 	bool metadata;
@@ -455,7 +482,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 		("int-n", "tune USRP with integer-N tuning")
 		("metadata", po::value<bool>(&metadata)->default_value(false),"enable metadata, should write =true")
 		("detachhdr", po::value<bool>(&detachhdr)->default_value(true),"enable detachhdr, true by default, set false should write = false")
-		("segsize", po::value<size_t>(&segsize)->default_value(1e6), "segment size for metadata segmentation")	  
+		("segsize", po::value<size_t>(&segsize)->default_value(1e6), "segment size for metadata segmentation")
+		("starttime", po::value<std::string>(&start_time)->default_value("0"), "set up start streaming time")	  	  
 		;
 	po::variables_map vm;
 	po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -555,7 +583,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 	}
 
 #define recv_to_file_args(format) \
-	(usrp, format, wirefmt, file, cbcapacity, total_num_samps,segsize, total_time, bw_summary, \
+	(usrp, format, wirefmt, file, start_time, cbcapacity, total_num_samps,segsize, total_time, bw_summary, \
 	 stats, null, enable_size_map, continue_on_bad_packet,metadata,detachhdr)
 	//recv to file
 	if (type == "double") recv_to_file<std::complex<double> >recv_to_file_args("fc64");
