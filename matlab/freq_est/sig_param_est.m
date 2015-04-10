@@ -1,12 +1,12 @@
-function [fhatArr, varfhatArr, phihatArr, varphihatArr, ahatArr, varahatArr,DFT_windowed_x] = sig_param_est(x, variance_of_whiteNoise, samplingRate,windowSize)
+function [fhatArr, varfhatArrCRL, phihatArr, varphihatArrCRL, ahatArr, varahatArrCRL,DFT_windowed_x] = sig_param_est(x, variance_of_whiteNoise, samplingRate,windowSize)
 blkN = 1;
 [N,cols] = size(x);  %complex signal length
 fhatArr = [];
-varfhatArr =  [];
+varfhatArrCRL =  [];
 phihatArr = [];
-varphihatArr = [];
+varphihatArrCRL = [];
 ahatArr = [];
-varahatArr = [];
+varahatArrCRL = [];
 loopCount = 0;
 % windowFunc = hann(windowSize, 'periodic');
 windowFunc = ones(windowSize,1);
@@ -27,16 +27,16 @@ N = (length(x) - mod(length(x),windowSize));  %file length rounded of to highest
         % Parameter Estimation which referenced: "D. Rife and R.R. Boorstyn Single tone 
         % parameter estimation from discrete-time observations        
         ahat = sum(windowed_x.*(exp(-i*2*pi*(fhat/samplingRate)*(1:windowSize)')))/windowSize;
-        phihat = atan(imag(ahat*windowSize)/real(ahat*windowSize));
-        varfhat = 6*(variance_of_whiteNoise)/((2*pi.^2)*windowSize*(windowSize.^2 - 1)*max(abs(windowed_x))^2);
-        varphihat = (variance_of_whiteNoise)*(2*windowSize -1)/((2*pi.^2)*windowSize*(windowSize + 1)*max(abs(windowed_x))^2);
-        varahat = (variance_of_whiteNoise)/(2*windowSize);
+        phihat = atan2(imag(ahat*windowSize),real(ahat*windowSize));
+        varfhatCRL = 6*(variance_of_whiteNoise)/((2*pi.^2)*windowSize*(windowSize.^2 - 1)*max(abs(windowed_x))^2);
+        varphihatCRL = (variance_of_whiteNoise)*(2*windowSize -1)/((2*pi.^2)*windowSize*(windowSize + 1)*max(abs(windowed_x))^2);
+        varahatCRL = (variance_of_whiteNoise)/(2*windowSize);
         fhatArr = [fhatArr, fhat];
-        varfhatArr =  [varfhatArr, varfhat];
+        varfhatArrCRL =  [varfhatArrCRL, varfhatCRL];
         phihatArr = [phihatArr, phihat];
-        varphihatArr = [varphihatArr, varphihat];
+        varphihatArrCRL = [varphihatArrCRL, varphihatCRL];
         ahatArr = [ahatArr, ahat];
-        varahatArr = [varahatArr, varahat];
+        varahatArrCRL = [varahatArrCRL, varahatCRL];
         loopCount = loopCount+1;
     end
 end

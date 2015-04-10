@@ -76,42 +76,41 @@ for windowIndx=1:length(windowSizeArr)
     while (nd<=NumOfNodes)
         while (nf<=length(filePathsArray))
             complexSignal = read_cshort_binary(filePathsArray{nf,nd});
-            [fhatArr, varfhatArr, phihatArr, varphihatArr, ahatArr, varahatArr, DFT_windowed_x] = sig_param_est(complexSignal, variance_of_whiteNoise, samplingRate, windowSize);
+            [fhatArr, varfhatArrCRL, phihatArr, varphihatArrCRL, ahatArr, varahatArrCRL, DFT_windowed_x] = sig_param_est(complexSignal, variance_of_whiteNoise, samplingRate, windowSize);
             s1= strcat(' for node_',num2str(nd),' file_',num2str(nf));
             if(nd<=1)
                 figure(nf)
             else
                 figure(((nd-1)*length(filePathsArray)) + nf)
             end
-            
             subplot(4,2,1)
             plot(fhatArr)
             title(strcat('fhat',s1))
             xlabel('Window number') % x-axis label
             ylabel('fhat (Hz)') % y-axis label
             subplot(4,2,2)
-            plot(varfhatArr)
-            title(strcat('varfhatArr',s1))
+            plot(varfhatArrCRL)
+            title(strcat('varfhatArrCRL',s1))
             xlabel('Window number') % x-axis label
-            ylabel('varfhat ()') % y-axis label
+            ylabel('varfhat (Hz)') % y-axis label
             subplot(4,2,3)
             plot(phihatArr)
             title(strcat('phihatArr',s1))
             xlabel('Window number') % x-axis label
-            ylabel('phihat ()') % y-axis label
+            ylabel('phihat (rad)') % y-axis label
             subplot(4,2,4)
-            plot(varphihatArr)
-            title(strcat('varphihatArr',s1))
+            plot(varphihatArrCRL)
+            title(strcat('varphihatArrCRL',s1))
             xlabel('Window number') % x-axis label
-            ylabel('varphihat ()') % y-axis label
+            ylabel('varphihat (rad)') % y-axis label
             subplot(4,2,5)
             plot(abs(ahatArr))
             title(strcat('ahatArr',s1))
             xlabel('Window number') % x-axis label
-            ylabel('ahat ()') % y-axis label
+            ylabel('ahat (magnitude)') % y-axis label
             
 % %             subplot(4,2,6)
-% %             plot(varahatArr)
+% %             plot(varahatArrCRL)
 % %             title(strcat('varahatArr',s1))
 % %             xlabel('Window number') % x-axis label
 % %             ylabel('varahat (Hz)') % y-axis label
@@ -132,9 +131,9 @@ for windowIndx=1:length(windowSizeArr)
             fhatAvg = sum(fhatArr)/length(fhatArr);
             varfhat =  var(fhatArr);
             phihatAvg = sum(phihatArr)/length(phihatArr);
-            varphihat = var(varphihatArr);
+            varphihat = var(phihatArr);
             ahatAvg = sum(ahatArr)/length(ahatArr);
-            varahatAvg = sum(varahatArr)/length(varahatArr);
+            varahatAvg = sum(ahatArr)/length(ahatArr);
             fprintf('For file %d, on node %d \n',nf ,nd);
             fprintf('fhatAvg : %d ;varfhat : %d ;phihatAvg : %d ;varphihat : %d ;ahatAvg : %d ;varahatAvg : %d ; \n'...
                 , fhatAvg,varfhat,phihatAvg,varphihat,ahatAvg,varahatAvg);
