@@ -198,7 +198,7 @@ std::time_t UTC_to_spec_t(const char *buffer){
 	//utc to time_t	
 	std::time_t std_time = mktime(&newtime);
 	//Print out starting time in future
-	std::cout << "Start time: "<< ctime(&std_time) <<std::endl;
+	std::cout << "\nStart time: "<< ctime(&std_time) << std::endl;
 	
 	return std_time;
 }
@@ -257,8 +257,7 @@ template<typename samp_type> void recv_to_file(
 		std::cerr << "Element size " << CB_ELEMENT_SIZE << " not an integer # of samples" 
 			<< std::endl;
 	}
-	printf("Elements are %d bytes, %zu samples/element, %zu elements in \
-			circular buffer\n",CB_ELEMENT_SIZE,samps_per_element,cbcapacity);
+	printf("Elements are %d bytes, %zu samples/element, %zu elements in \ circular buffer\n",CB_ELEMENT_SIZE,samps_per_element,cbcapacity);
 	circbuff_element_t read_ele;
 	//setup streaming
 	uhd::stream_cmd_t stream_cmd((num_requested_samples == 0)?
@@ -275,15 +274,13 @@ template<typename samp_type> void recv_to_file(
 		stream_cmd.stream_now = true;
 		stream_cmd.time_spec = uhd::time_spec_t();
 	} else {
-		//Set up starting time for streaming
+		//Set up future streaming time
 		std_start_time = UTC_to_spec_t(start_time.data());
 		//time_t to time_spec_t
 		uhd::time_spec_t usrp_time = uhd::time_spec_t(std_start_time,0);
 		stream_cmd.time_spec = usrp_time;
 	}
 	
-
-
 
 	rx_stream->issue_stream_cmd(stream_cmd);
 	//boost::system_time start = boost::get_system_time();
@@ -381,18 +378,18 @@ template<typename samp_type> void recv_to_file(
 				last_update = now;
 			}
 		}
-		
+
 		now = boost::get_system_time();
 		ticks_diff = now - start;
+		//Print out message if future streaming time reached
 		if(ticks_diff.ticks() >= 0 && !start_stream) {
 			std::cout << "Starting streaming..." << std::endl;
 			std::cout << now << std::endl;
 			start_stream =true;
 		}
 
-		//std::cout << ticks_diff << std::endl;
-		if (ticks_requested > 0){
-			if ((unsigned long long)ticks_diff.ticks() > ticks_requested) {
+		if (ticks_requested > 0 && start_stream){
+			if ((unsigned long long)ticks_diff.ticks() > ticks_requested) {					
 				break;
 			}
 		}
