@@ -302,9 +302,13 @@ template<typename samp_type> void recv_to_file(
 	SizeMap mapSizes;
 	boost::thread write_thread(usrp_write_samples_to_file,fd,&buff,detachhdr);
 
+	//When reach future stream time, it will be set to be true
+	bool start_stream = false;
+
 	while(not done and (num_requested_samples != num_total_samps 
 				or num_requested_samples == 0)){
 		boost::system_time now = boost::get_system_time();
+	//	std::cout<< to_simple_string(now) << std::endl;
 
 		size_t num_rx_samps = rx_stream->recv((samp_type*)&read_ele,
 				samps_per_element, md,3.0, enable_size_map);
@@ -377,10 +381,20 @@ template<typename samp_type> void recv_to_file(
 				last_update = now;
 			}
 		}
+		
+		now = boost::get_system_time();
 		ticks_diff = now - start;
+		if(ticks_diff.ticks() >= 0 && !start_stream) {
+			std::cout << "Starting streaming..." << std::endl;
+			std::cout << now << std::endl;
+			start_stream =true;
+		}
+
+		//std::cout << ticks_diff << std::endl;
 		if (ticks_requested > 0){
-			if ((unsigned long long)ticks_diff.ticks() > ticks_requested)
+			if ((unsigned long long)ticks_diff.ticks() > ticks_requested) {
 				break;
+			}
 		}
 
 	}
