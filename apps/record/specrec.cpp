@@ -39,6 +39,8 @@
 #include <pthread.h>
 //for utc time converting
 #include <time.h>
+//ptime lib
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 //int create_metadata_header(char * header, double samp_rate, double freq, double gain);
 std::string create_metadata_header( double samp_rate, double freq, double gain, uhd::time_spec_t timestamp, unsigned long long segment_samps_size, unsigned long long item_num);
@@ -188,12 +190,17 @@ void metadata_handle(int fd, int fd_hdr, bool metadata, bool detachhdr, uhd::usr
 }
 
 
-uhd::time_spec_t UTC_to_spec_t(const char *buffer){
+std::time_t UTC_to_spec_t(const char *buffer){
 	struct tm newtime = {0};
 	strptime(buffer, "%F %H:%M:%S %z", &newtime);
+	//adjust daylight time saving
+	newtime.tm_isdst = -1;  
+	//utc to time_t	
 	std::time_t std_time = mktime(&newtime);
-	uhd::time_spec_t usrp_time = uhd::time_spec_t(std_time,0);
-	return usrp_time;
+	//Print out starting time in future
+	std::cout << "Start time: "<< ctime(&std_time) <<std::endl;
+	
+	return std_time;
 }
 
 template<typename samp_type> void recv_to_file(
@@ -262,13 +269,16 @@ template<typename samp_type> void recv_to_file(
 	stream_cmd.stream_now = false;
 	
 
+	std::time_t std_start_time = std::time(NULL);
 	if(start_time.compare("0") ==0) {
 		//Default starting time is now
 		stream_cmd.stream_now = true;
 		stream_cmd.time_spec = uhd::time_spec_t();
 	} else {
 		//Set up starting time for streaming
-		uhd::time_spec_t usrp_time = UTC_to_spec_t(start_time.data());
+		std_start_time = UTC_to_spec_t(start_time.data());
+		//time_t to time_spec_t
+		uhd::time_spec_t usrp_time = uhd::time_spec_t(std_start_time,0);
 		stream_cmd.time_spec = usrp_time;
 	}
 	
@@ -276,28 +286,29 @@ template<typename samp_type> void recv_to_file(
 
 
 	rx_stream->issue_stream_cmd(stream_cmd);
-	boost::system_time start = boost::get_system_time();
+	//boost::system_time start = boost::get_system_time();
+        boost::system_time start =  boost::posix_time::from_time_t(std_start_time);
+
 	unsigned long long ticks_requested = 
 		(long)(time_requested * (double)boost::posix_time::time_duration::ticks_per_second());
 	boost::posix_time::time_duration ticks_diff;
 	boost::system_time last_update = start;
 	unsigned long long last_update_samps = 0;
-
-	if (metadata) {
-		//..
-	}
-
+	
+	//handle metadata writting
 	boost::thread metadata_handle_thread(metadata_handle,fd, fd_hdr, metadata, detachhdr, usrp, &num_total_samps, segsize, &md);
- 
 	
 	typedef std::map<size_t,size_t> SizeMap;
 	SizeMap mapSizes;
 	boost::thread write_thread(usrp_write_samples_to_file,fd,&buff,detachhdr);
+
 	while(not done and (num_requested_samples != num_total_samps 
 				or num_requested_samples == 0)){
 		boost::system_time now = boost::get_system_time();
+
 		size_t num_rx_samps = rx_stream->recv((samp_type*)&read_ele,
 				samps_per_element, md,3.0, enable_size_map);
+
 		circbuff_notfull = buff.push_with_haste(read_ele);
 		num_elements.inc();
 		if( !circbuff_notfull ){
@@ -305,8 +316,10 @@ template<typename samp_type> void recv_to_file(
 			done = true;
 		}
 		if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
-			std::cout << boost::format("Timeout while streaming") << std::endl;
-			break;
+			std::cout << "Time out" << std::endl;
+			continue;
+			//std::cout << boost::format("Timeout while streaming") << std::endl;
+			//break;
 		}
 		if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_OVERFLOW){
 			if (overflow_message){
@@ -572,10 +585,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 
 	// Set the computer time onto the USRP
         std::time_t currentTimeSec = std::time(NULL);
-        std::cout << "Current time: "<<currentTimeSec <<std::endl;
+        std::cout << "Current time: "<< ctime(&currentTimeSec) <<std::endl;
         uhd::time_spec_t currentTime(currentTimeSec);
         usrp->set_time_now(currentTime);
-
 
 	if (total_num_samps == 0){
 		std::signal(SIGINT, &sig_int_handler);
