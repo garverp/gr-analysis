@@ -124,9 +124,9 @@ std::string create_metadata_header( double samp_rate, double freq, double gain, 
 	
 	header = pmt::make_dict();
 	header = pmt::dict_add(header, pmt::mp("version"), pmt::mp(METADATA_VERSION));
-	header = pmt::dict_add(header, pmt::mp("size"), pmt::from_long(2));
+	header = pmt::dict_add(header, pmt::mp("size"), pmt::from_long(4));
 	header = pmt::dict_add(header, pmt::mp("type"), pmt::from_long(1));
-	header = pmt::dict_add(header, pmt::mp("cplx"), pmt::PMT_F);
+	header = pmt::dict_add(header, pmt::mp("cplx"), pmt::PMT_T);
 	header = pmt::dict_add(header, pmt::mp("rx_time"), pmt::make_tuple(pmt::from_uint64(timestamp.get_full_secs()), pmt::from_double(timestamp.get_frac_secs()) ));//timestamp);
 	header = pmt::dict_add(header, pmt::mp("rx_rate"), pmt::mp(samp_rate));
 	header = pmt::dict_add(header, pmt::mp("bytes"), pmt::from_uint64(4*segment_samps_size));
