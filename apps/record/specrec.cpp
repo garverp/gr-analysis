@@ -607,13 +607,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 	//Set the computer time onto the USRP
 	if(std::find(sensor_names.begin(), sensor_names.end(), "gps_time") != sensor_names.end()) {
 		uhd::sensor_value_t gps_time = usrp->get_mboard_sensor("gps_time");
- 		std::cout << "GPS time: "<< gps_time.to_real() <<std::endl;
 		uhd::time_spec_t usrp_time(gps_time.to_real());	
        		usrp->set_time_now(usrp_time);
+                std::cout << "Set USRP with GPS time: "<< gps_time.to_real() <<std::endl;
 	} else {
 		uhd::time_spec_t timestamp = uhd::time_spec_t::get_system_time(); 
-	        std::cout << "Current time: "<< timestamp.get_full_secs() <<std::endl;	
        		usrp->set_time_now(timestamp);
+		std::cout << "Set USRP time with UHD system time: "<< timestamp.get_full_secs() <<std::endl;
 	}
     
 
