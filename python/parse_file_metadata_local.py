@@ -94,8 +94,11 @@ def parse_header(p, VERBOSE=False):
         info["rx_time"] = t
         if(VERBOSE):
             time = datetime.fromtimestamp(t).strftime('%m/%d/%Y %H:%M:%S')
-            print "Timestamp: " + time
-            print "Linux Epoch: {0:.6f}".format(t) + " Seconds"
+            print "Timestamp (Unix Epoch): " + time
+	    print "Integer Seconds: " + repr(secs)
+	    print "Fractional Seconds: " + repr(fracs)
+            #print "Linux Epoch: {0:.6f}".format(t) + " Seconds"
+	    
     else:
         sys.stderr.write("Could not find key 'time': invalid or corrupt data file.\n")
         sys.exit(1)

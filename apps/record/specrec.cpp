@@ -1,4 +1,3 @@
-//
 // Copyright 2010-2011,2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
@@ -36,10 +35,20 @@
 #include <uhd/utils/atomic.hpp>
 // need PMT for metadata headers
 #include <pmt/pmt.h>
+//pthread lib
+#include <pthread.h>
+//for utc time converting
+#include <time.h>
+//ptime lib
+#include <boost/date_time/posix_time/posix_time.hpp>
+
 //int create_metadata_header(char * header, double samp_rate, double freq, double gain);
-std::string create_metadata_header( double samp_rate, double freq, double gain, uhd::time_spec_t timestamp);
+std::string create_metadata_header( double samp_rate, double freq, double gain, uhd::time_spec_t timestamp, unsigned long long segment_samps_size, unsigned long long item_num);
 #define METADATA_HEADER_SIZE 149
 #define CB_ELEMENT_SIZE 4096
+
+static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;  
+static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 typedef struct circbuff_element{
 	char a[CB_ELEMENT_SIZE];
@@ -53,14 +62,17 @@ uhd::atomic_uint32_t num_elements;
 void sig_int_handler(int){ done = true; }
 
 void usrp_write_samples_to_file(int fd, 
-		uhd::transport::bounded_buffer<circbuff_element_t>* cb){
+		uhd::transport::bounded_buffer<circbuff_element_t>* cb, bool detachhdr){
 	int bytes_written = 0;
 	circbuff_element_t write_ele;
 	while (!done){
 		// Block until we have some data to write
 		cb->pop_with_wait(write_ele); 
 		bytes_written = write(fd,(void*)&write_ele,CB_ELEMENT_SIZE);
+		// Using lock to avoid collisions with in file metadata writing.
+		if(!detachhdr){pthread_mutex_lock(&mtx);}
 		sync_file_range(fd,0,0,SYNC_FILE_RANGE_WRITE);
+		if(!detachhdr){pthread_mutex_unlock(&mtx);} 
 		if( bytes_written != CB_ELEMENT_SIZE ){
 			if( bytes_written < 0 ){
 				printf("Problem writing: %s\n",strerror(errno));
@@ -97,33 +109,36 @@ std::cout << hdr_str;
 std::strcpy (headerC, hdr_str.c_str());
 return headerSize;
 }*/
-std::string create_metadata_header( double samp_rate, double freq, double gain, uhd::time_spec_t timestamp) {
+std::string create_metadata_header( double samp_rate, double freq, double gain, uhd::time_spec_t timestamp,unsigned long long segment_samps_size, unsigned long long item_num) {
 	// use GNU Radio's PMT methods to construct the header	
 	const char METADATA_VERSION = 0x0;
 	int headerSize;  
 	pmt::pmt_t extras;
 	extras = pmt::make_dict();
 	extras = pmt::dict_add(extras, pmt::mp("rx_freq"), pmt::mp(freq));
+	//item_num specify the order of each segment metadata
+        extras = pmt::dict_add(extras, pmt::mp("item_num"), pmt::from_uint64(item_num));
 	std::string ext_str = pmt::serialize_str(extras);
 
 	pmt::pmt_t header;
 	
 	header = pmt::make_dict();
 	header = pmt::dict_add(header, pmt::mp("version"), pmt::mp(METADATA_VERSION));
-	header = pmt::dict_add(header, pmt::mp("size"), pmt::from_long(2));
+	header = pmt::dict_add(header, pmt::mp("size"), pmt::from_long(4));
 	header = pmt::dict_add(header, pmt::mp("type"), pmt::from_long(1));
-	header = pmt::dict_add(header, pmt::mp("cplx"), pmt::PMT_F);
+	header = pmt::dict_add(header, pmt::mp("cplx"), pmt::PMT_T);
 	header = pmt::dict_add(header, pmt::mp("rx_time"), pmt::make_tuple(pmt::from_uint64(timestamp.get_full_secs()), pmt::from_double(timestamp.get_frac_secs()) ));//timestamp);
 	header = pmt::dict_add(header, pmt::mp("rx_rate"), pmt::mp(samp_rate));
-	header = pmt::dict_add(header, pmt::mp("bytes"), pmt::from_uint64(4e6));
+	header = pmt::dict_add(header, pmt::mp("bytes"), pmt::from_uint64(4*segment_samps_size));
 	header = pmt::dict_add(header, pmt::mp("strt"), pmt::from_uint64(METADATA_HEADER_SIZE+ext_str.size()));
+
 
 	std::string hdr_str = pmt::serialize_str(header);
 //	std::cout << hdr_str + ext_str;
 	return hdr_str + ext_str;
 }
 
-void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t timestamp) {
+void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t timestamp, unsigned long long segment_samps_size, bool detachhdr, unsigned long long item_num) {
 
 	// METADATA - write one header at beginning of file
 	char header[METADATA_HEADER_SIZE];
@@ -131,32 +146,61 @@ void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t t
 	std::string header_str;
 	//uhd::time_spec_t timestamp = uhd::time_spec_t::get_system_time(); 
 	// can record metadata straight from USRP
-	header_str = create_metadata_header( usrp->get_rx_rate(), usrp->get_rx_freq(), usrp->get_rx_gain(), timestamp);
+	header_str = create_metadata_header( usrp->get_rx_rate(), usrp->get_rx_freq(), usrp->get_rx_gain(), timestamp, segment_samps_size, item_num);
 	//std::cout << std::endl << header_str.size() <<std::endl;
+	// Using lock to avoid collisions with sample writing.
+        if(!detachhdr){	pthread_mutex_lock(&mtx);}
 	write(fd,header_str.c_str(),header_str.size());
+        if(!detachhdr){pthread_mutex_unlock(&mtx);}
 }
 
 void write_seg_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::rx_metadata_t *md,
-		unsigned long long * num_total_samps, unsigned long long segment_samps_size) {
+		unsigned long long * num_total_samps, unsigned long long segment_samps_size, bool detachhdr) {
+
 	int counter = 1;
+	unsigned long long item_num = 0;;
 	while(!done) {
 		if(*num_total_samps >= counter*segment_samps_size){
-                        write_metadata(fd,usrp, md->time_spec);
+			//The first sample number in each segment.
+			item_num = (counter-1)*segment_samps_size;
+            		write_metadata(fd,usrp, md->time_spec, segment_samps_size, detachhdr, item_num);
 			counter++;
 			//std::cout << timestamp; 
+		} else {
+			pthread_cond_wait(&cond, &mtx);
 		}
 	}
+
+	//write leftover samples metadata which has size less than segment divition size
+	if(*num_total_samps > 0) {
+		write_metadata(fd,usrp, md->time_spec, *num_total_samps%segment_samps_size, detachhdr, item_num);
+	}
+	
 }
 
 void metadata_handle(int fd, int fd_hdr, bool metadata, bool detachhdr, uhd::usrp::multi_usrp::sptr usrp,
 		unsigned long long * num_total_samps, unsigned long long segment_samps_size, uhd::rx_metadata_t *md) {
 	if(metadata) {
 		if(detachhdr){
-			write_seg_metadata(fd_hdr, usrp, md, num_total_samps, segment_samps_size);
+			write_seg_metadata(fd_hdr, usrp, md, num_total_samps, segment_samps_size, detachhdr);
 		} else {
-			write_seg_metadata(fd, usrp, md, num_total_samps, segment_samps_size);
+			write_seg_metadata(fd, usrp, md, num_total_samps, segment_samps_size, detachhdr);
 		}	
 	}
+}
+
+
+std::time_t UTC_to_spec_t(const char *buffer){
+	struct tm newtime = {0};
+	strptime(buffer, "%F %H:%M:%S %z", &newtime);
+	//adjust daylight time saving
+	newtime.tm_isdst = -1;  
+	//utc to time_t	
+	std::time_t std_time = mktime(&newtime);
+	//Print out starting time in future
+	std::cout << "\nStart time: "<< ctime(&std_time) << std::endl;
+	
+	return std_time;
 }
 
 template<typename samp_type> void recv_to_file(
@@ -164,8 +208,10 @@ template<typename samp_type> void recv_to_file(
 		const std::string &cpu_format,
 		const std::string &wire_format,
 		const std::string &file,
+	        const std::string &start_time,
 		size_t cbcapacity,
 		unsigned long long num_requested_samples,
+		unsigned long long segsize, 
 		double time_requested = 0.0,
 		bool bw_summary = false,
 		bool stats = false,
@@ -188,7 +234,7 @@ template<typename samp_type> void recv_to_file(
 	int fd_hdr = 0;
 	std::string file_hdr = std::string(file);
 	//segment sample size
-	unsigned long long segment_samps_size = 100000; 
+	//unsigned long long segment_samps_size = 1000000; 
 
 	if( (fd = open(file.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NONBLOCK, 
 					S_IRWXU|S_IRWXG|S_IRWXO)) < 0 ){
@@ -211,8 +257,7 @@ template<typename samp_type> void recv_to_file(
 		std::cerr << "Element size " << CB_ELEMENT_SIZE << " not an integer # of samples" 
 			<< std::endl;
 	}
-	printf("Elements are %d bytes, %zu samples/element, %zu elements in \
-			circular buffer\n",CB_ELEMENT_SIZE,samps_per_element,cbcapacity);
+	printf("Elements are %d bytes, %zu samples/element, %zu elements in \ circular buffer\n",CB_ELEMENT_SIZE,samps_per_element,cbcapacity);
 	circbuff_element_t read_ele;
 	//setup streaming
 	uhd::stream_cmd_t stream_cmd((num_requested_samples == 0)?
@@ -220,31 +265,51 @@ template<typename samp_type> void recv_to_file(
 			uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE
 			);
 	stream_cmd.num_samps = num_requested_samples;
-	stream_cmd.stream_now = true;
-	stream_cmd.time_spec = uhd::time_spec_t();
+	stream_cmd.stream_now = false;
+	
+
+	std::time_t std_start_time = std::time(NULL);
+	if(start_time.compare("0") ==0) {
+		//Default starting time is now
+		stream_cmd.stream_now = true;
+		stream_cmd.time_spec = uhd::time_spec_t();
+	} else {
+		//Set up future streaming time
+		std_start_time = UTC_to_spec_t(start_time.data());
+		//time_t to time_spec_t
+		uhd::time_spec_t usrp_time = uhd::time_spec_t(std_start_time,0);
+		stream_cmd.time_spec = usrp_time;
+	}
+	
+
 	rx_stream->issue_stream_cmd(stream_cmd);
-	boost::system_time start = boost::get_system_time();
+	//boost::system_time start = boost::get_system_time();
+        boost::system_time start =  boost::posix_time::from_time_t(std_start_time);
+
 	unsigned long long ticks_requested = 
 		(long)(time_requested * (double)boost::posix_time::time_duration::ticks_per_second());
 	boost::posix_time::time_duration ticks_diff;
 	boost::system_time last_update = start;
 	unsigned long long last_update_samps = 0;
-
-	if (metadata) {
-		//..
-	}
-
-	boost::thread metadata_handle_thread(metadata_handle,fd, fd_hdr, metadata, detachhdr, usrp, &num_total_samps, segment_samps_size, &md);
- 
+	
+	//handle metadata writting
+	boost::thread metadata_handle_thread(metadata_handle,fd, fd_hdr, metadata, detachhdr, usrp, &num_total_samps, segsize, &md);
 	
 	typedef std::map<size_t,size_t> SizeMap;
 	SizeMap mapSizes;
-	boost::thread write_thread(usrp_write_samples_to_file,fd,&buff);
+	boost::thread write_thread(usrp_write_samples_to_file,fd,&buff,detachhdr);
+
+	//When reach future stream time, it will be set to be true
+	bool start_stream = false;
+
 	while(not done and (num_requested_samples != num_total_samps 
 				or num_requested_samples == 0)){
 		boost::system_time now = boost::get_system_time();
+	//	std::cout<< to_simple_string(now) << std::endl;
+
 		size_t num_rx_samps = rx_stream->recv((samp_type*)&read_ele,
 				samps_per_element, md,3.0, enable_size_map);
+
 		circbuff_notfull = buff.push_with_haste(read_ele);
 		num_elements.inc();
 		if( !circbuff_notfull ){
@@ -252,8 +317,10 @@ template<typename samp_type> void recv_to_file(
 			done = true;
 		}
 		if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
-			std::cout << boost::format("Timeout while streaming") << std::endl;
-			break;
+			std::cout << "Time out" << std::endl;
+			continue;
+			//std::cout << boost::format("Timeout while streaming") << std::endl;
+			//break;
 		}
 		if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_OVERFLOW){
 			if (overflow_message){
@@ -289,6 +356,14 @@ template<typename samp_type> void recv_to_file(
 		if( num_rx_samps != samps_per_element ){
 			printf("Only got %zu/%zu samples\n",num_rx_samps,samps_per_element);
 		}
+		
+		//If segment metadata specified, check segment sample size
+		unsigned long long counter = 1;
+		if(num_total_samps >= segsize*counter) {
+			counter++;
+			pthread_cond_signal(&cond);
+		}
+		
 		if (bw_summary){
 			last_update_samps += num_rx_samps;
 			boost::posix_time::time_duration update_diff = now - last_update;
@@ -303,14 +378,25 @@ template<typename samp_type> void recv_to_file(
 				last_update = now;
 			}
 		}
+
+		now = boost::get_system_time();
 		ticks_diff = now - start;
-		if (ticks_requested > 0){
-			if ((unsigned long long)ticks_diff.ticks() > ticks_requested)
+		//Print out message if future streaming time reached
+		if(ticks_diff.ticks() >= 0 && !start_stream) {
+			std::cout << "Starting streaming..." << std::endl;
+			std::cout << now << std::endl;
+			start_stream =true;
+		}
+
+		if (ticks_requested > 0 && start_stream){
+			if ((unsigned long long)ticks_diff.ticks() > ticks_requested) {					
 				break;
+			}
 		}
 
 	}
 	done = true;
+        pthread_cond_signal(&cond);
 	// Wait for thread to exit
 	write_thread.join();
 	metadata_handle_thread.join(); 
@@ -387,8 +473,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 	uhd::set_thread_priority_safe();
 
 	//variables to be set by po
-	std::string args, file, type, ant, subdev, ref, wirefmt;
-	size_t total_num_samps, cbcapacity;
+	std::string args, file, type, ant, subdev, ref, wirefmt, start_time;
+	size_t total_num_samps, cbcapacity, segsize;
 	double rate, freq, gain, bw, total_time, setup_time;
 	bool metadata;
 	bool detachhdr;
@@ -401,7 +487,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 		("type", po::value<std::string>(&type)->default_value("short"), "sample type: double, float, or short")
 		("nsamps", po::value<size_t>(&total_num_samps)->default_value(0), "total number of samples to receive")
 		("time", po::value<double>(&total_time)->default_value(0), "total number of seconds to receive")
-		("cbcapacity", po::value<size_t>(&cbcapacity)->default_value(1024), "Elements per Circular Buffer")
+		("cbcapacity", po::value<size_t>(&cbcapacity)->default_value(4096), "Elements per Circular Buffer")
 		("rate", po::value<double>(&rate)->default_value(1e6), "rate of incoming samples")
 		("freq", po::value<double>(&freq)->default_value(0.0), "RF center frequency in Hz")
 		("gain", po::value<double>(&gain), "gain for the RF chain")
@@ -419,7 +505,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 		("skip-lo", "skip checking LO lock status")
 		("int-n", "tune USRP with integer-N tuning")
 		("metadata", po::value<bool>(&metadata)->default_value(false),"enable metadata, should write =true")
-		("detachhdr", po::value<bool>(&detachhdr)->default_value(true),"enable detachhdr, true by default, set false should write = false")	  
+		("detachhdr", po::value<bool>(&detachhdr)->default_value(true),"enable detachhdr, true by default, set false should write = false")
+		("segsize", po::value<size_t>(&segsize)->default_value(1e6), "segment size for metadata segmentation")
+		("starttime", po::value<std::string>(&start_time)->default_value("0"), "set up start streaming time")	  	  
 		;
 	po::variables_map vm;
 	po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -507,10 +595,10 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 	}
 
 	// Set the computer time onto the USRP
-	std::time_t currentTimeSec = std::time(NULL);
-	std::cout << "Current time: "<<currentTimeSec <<std::endl;
-	uhd::time_spec_t currentTime(currentTimeSec);
-	usrp->set_time_now(currentTime);
+        std::time_t currentTimeSec = std::time(NULL);
+        std::cout << "Current time: "<< ctime(&currentTimeSec) <<std::endl;
+        uhd::time_spec_t currentTime(currentTimeSec);
+        usrp->set_time_now(currentTime);
 
 	if (total_num_samps == 0){
 		std::signal(SIGINT, &sig_int_handler);
@@ -518,7 +606,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 	}
 
 #define recv_to_file_args(format) \
-	(usrp, format, wirefmt, file, cbcapacity, total_num_samps, total_time, bw_summary, \
+	(usrp, format, wirefmt, file, start_time, cbcapacity, total_num_samps,segsize, total_time, bw_summary, \
 	 stats, null, enable_size_map, continue_on_bad_packet,metadata,detachhdr)
 	//recv to file
 	if (type == "double") recv_to_file<std::complex<double> >recv_to_file_args("fc64");
