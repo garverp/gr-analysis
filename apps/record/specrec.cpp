@@ -173,6 +173,8 @@ void write_seg_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::rx_metada
 
 	//write leftover samples metadata which has size less than segment divition size
 	if(*num_total_samps > 0) {
+		//The first sample number in each segment.
+		item_num = (counter-1)*segment_samps_size;
 		write_metadata(fd,usrp, md->time_spec, *num_total_samps%segment_samps_size, detachhdr, item_num);
 	}
 	
@@ -301,6 +303,9 @@ template<typename samp_type> void recv_to_file(
 
 	bool start_stream = false;
 
+	//The counter is used for multiple segment metadata checking.   
+	unsigned long long seg_counter = 1;
+
 	while(not done and (num_requested_samples != num_total_samps 
 				or num_requested_samples == 0)){
 		boost::system_time now = boost::get_system_time();
@@ -355,12 +360,14 @@ template<typename samp_type> void recv_to_file(
 			printf("Only got %zu/%zu samples\n",num_rx_samps,samps_per_element);
 		}
 		
-		//If segment metadata specified, check segment sample size
-		unsigned long long counter = 1;
-		if(num_total_samps >= segsize*counter) {
-			counter++;
-			pthread_cond_signal(&cond);
+		if(detachhdr && metadata) {
+			//If segment metadata specified, check segment sample size
+			if(num_total_samps >= segsize*seg_counter) {
+				pthread_cond_signal(&cond);
+				seg_counter++;
+			}
 		}
+		
 		
 		if (bw_summary){
 			last_update_samps += num_rx_samps;
@@ -592,12 +599,22 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 			check_locked_sensor(usrp->get_mboard_sensor_names(0), "ref_locked",
 					boost::bind(&uhd::usrp::multi_usrp::get_mboard_sensor, usrp, _1, 0), setup_time);
 	}
+	
+	//Get sensor names from the usrp	
+	std::vector<std::string> sensor_names = usrp->get_mboard_sensor_names(0);
 
-	// Set the computer time onto the USRP
-        std::time_t currentTimeSec = std::time(NULL);
-        std::cout << "Current time: "<< ctime(&currentTimeSec) <<std::endl;
-        uhd::time_spec_t currentTime(currentTimeSec);
-        usrp->set_time_now(currentTime);
+	//Set the computer time onto the USRP
+	if(std::find(sensor_names.begin(), sensor_names.end(), "gps_time") != sensor_names.end()) {
+		uhd::sensor_value_t gps_time = usrp->get_mboard_sensor("gps_time");
+ 		std::cout << "GPS time: "<< gps_time.to_real() <<std::endl;
+		uhd::time_spec_t usrp_time(gps_time.to_real());	
+       		usrp->set_time_now(usrp_time);
+	} else {
+		uhd::time_spec_t timestamp = uhd::time_spec_t::get_system_time(); 
+	        std::cout << "Current time: "<< timestamp.get_full_secs() <<std::endl;	
+       		usrp->set_time_now(timestamp);
+	}
+    
 
 	if (total_num_samps == 0){
 		std::signal(SIGINT, &sig_int_handler);
