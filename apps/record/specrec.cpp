@@ -154,7 +154,7 @@ void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t t
         if(!detachhdr){pthread_mutex_unlock(&mtx);}
 }
 
-void write_seg_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::rx_metadata_t *md,
+void write_seg_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t *g_timestamp,
 		unsigned long long * num_total_samps, unsigned long long segment_samps_size, bool detachhdr) {
 
 	int counter = 1;
@@ -163,7 +163,7 @@ void write_seg_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::rx_metada
 		if(*num_total_samps >= counter*segment_samps_size){
 			//The first sample number in each segment.
 			item_num = (counter-1)*segment_samps_size;
-            		write_metadata(fd,usrp, md->time_spec, segment_samps_size, detachhdr, item_num);
+            		write_metadata(fd,usrp, *g_timestamp, segment_samps_size, detachhdr, item_num);
 			counter++;
 			//std::cout << timestamp; 
 		} else {
@@ -175,18 +175,18 @@ void write_seg_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::rx_metada
 	if(*num_total_samps > 0) {
 		//The first sample number in each segment.
 		item_num = (counter-1)*segment_samps_size;
-		write_metadata(fd,usrp, md->time_spec, *num_total_samps%segment_samps_size, detachhdr, item_num);
+		write_metadata(fd,usrp, *g_timestamp, *num_total_samps%segment_samps_size, detachhdr, item_num);
 	}
 	
 }
 
 void metadata_handle(int fd, int fd_hdr, bool metadata, bool detachhdr, uhd::usrp::multi_usrp::sptr usrp,
-		unsigned long long * num_total_samps, unsigned long long segment_samps_size, uhd::rx_metadata_t *md) {
+		unsigned long long * num_total_samps, unsigned long long segment_samps_size, uhd::time_spec_t *g_timestamp) {
 	if(metadata) {
 		if(detachhdr){
-			write_seg_metadata(fd_hdr, usrp, md, num_total_samps, segment_samps_size, detachhdr);
+			write_seg_metadata(fd_hdr, usrp, g_timestamp, num_total_samps, segment_samps_size, detachhdr);
 		} else {
-			write_seg_metadata(fd, usrp, md, num_total_samps, segment_samps_size, detachhdr);
+			write_seg_metadata(fd, usrp, g_timestamp, num_total_samps, segment_samps_size, detachhdr);
 		}	
 	}
 }
@@ -294,8 +294,6 @@ template<typename samp_type> void recv_to_file(
 	boost::system_time last_update = start;
 	unsigned long long last_update_samps = 0;
 	
-	//handle metadata writting
-	boost::thread metadata_handle_thread(metadata_handle,fd, fd_hdr, metadata, detachhdr, usrp, &num_total_samps, segsize, &md);
 	
 	typedef std::map<size_t,size_t> SizeMap;
 	SizeMap mapSizes;
@@ -306,6 +304,12 @@ template<typename samp_type> void recv_to_file(
 
 	//The counter is used for multiple segment metadata checking.   
 	unsigned long long seg_counter = 1;
+
+	//Gloable variable timestamp for metadata update
+	uhd::time_spec_t g_timestamp = uhd::time_spec_t();
+
+	//handle metadata writting
+	boost::thread metadata_handle_thread(metadata_handle,fd, fd_hdr, metadata, detachhdr, usrp, &num_total_samps, segsize, &g_timestamp); 
 
 	while(not done and (num_requested_samples != num_total_samps 
 				or num_requested_samples == 0)){
@@ -365,6 +369,7 @@ template<typename samp_type> void recv_to_file(
 		if(detachhdr && metadata) {
 			//If segment metadata specified, check segment sample size
 			if(num_total_samps >= segsize*seg_counter) {
+ 				g_timestamp = md.time_spec;
 				pthread_cond_signal(&cond);
 				seg_counter++;
 			}
@@ -513,7 +518,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 		("int-n", "tune USRP with integer-N tuning")
 		("metadata", po::value<bool>(&metadata)->default_value(false),"enable metadata, should write =true")
 		("detachhdr", po::value<bool>(&detachhdr)->default_value(true),"enable detachhdr, true by default, set false should write = false")
-		("segsize", po::value<size_t>(&segsize)->default_value(1e6), "segment size for metadata segmentation")
+		("segsize", po::value<size_t>(&segsize)->default_value(1e6), "segment size for metadata segmentation. To get accurate timestamp, segment size needs to be multiple of element size(4096 by default)")
 		("starttime", po::value<std::string>(&start_time)->default_value("0"), "set up start streaming time")	  	  
 		;
 	po::variables_map vm;
