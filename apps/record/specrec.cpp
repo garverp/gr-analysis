@@ -614,11 +614,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 		uhd::sensor_value_t gps_time = usrp->get_mboard_sensor("gps_time");
 		uhd::time_spec_t usrp_time(gps_time.to_real());	
        		usrp->set_time_now(usrp_time);
-                std::cout << "Set USRP with GPS time: "<< gps_time.to_real() <<std::endl;
+		time_t stdtime = gps_time.to_real();
+                std::cout << "Set USRP with GPS time: "<< ctime(&stdtime) <<std::endl;
 	} else {
-		uhd::time_spec_t timestamp = uhd::time_spec_t::get_system_time(); 
-       		usrp->set_time_now(timestamp);
-		std::cout << "Set USRP time with UHD system time: "<< timestamp.get_full_secs() <<std::endl;
+		//uhd::time_spec_t timestamp = uhd::time_spec_t::get_system_time(); 
+		time_t pc_time = time(0);       		
+		usrp->set_time_now(pc_time);
+		std::cout << "Set USRP time with UHD system time: "<< ctime(&pc_time) <<std::endl;
 	}
     
 
