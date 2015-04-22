@@ -278,11 +278,18 @@ template<typename samp_type> void recv_to_file(
 	} else {
 		//Set up future streaming time
 		std_start_time = UTC_to_spec_t(start_time.data());
-		//time_t to time_spec_t
-		uhd::time_spec_t usrp_time = uhd::time_spec_t(std_start_time,0);
-		stream_cmd.time_spec = usrp_time;
+		
+		//check if the future time is valid
+		if(std_start_time < std::time(NULL)) {
+			std::cout << boost::format("Invalid future streaming-time setup") << std::endl;
+			done = true;
+		} else {
+			//time_t to time_spec_t
+			uhd::time_spec_t usrp_time = uhd::time_spec_t(std_start_time,0);
+			stream_cmd.time_spec = usrp_time;
+		}
+
 	}
-	
 
 	rx_stream->issue_stream_cmd(stream_cmd);
 	//boost::system_time start = boost::get_system_time();
@@ -408,8 +415,9 @@ template<typename samp_type> void recv_to_file(
 
 	}
 	done = true;
+	//wrap up the leftover metadata writing
         pthread_cond_signal(&cond);
-	// Wait for thread to exit
+	// Wait for threads to exit
 	write_thread.join();
 	metadata_handle_thread.join(); 
 	close(fd);  
