@@ -526,8 +526,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 		("int-n", "tune USRP with integer-N tuning")
 		("metadata", po::value<bool>(&metadata)->default_value(false),"enable metadata, should write =true")
 		("detachhdr", po::value<bool>(&detachhdr)->default_value(true),"enable detachhdr, true by default, set false should write = false")
-		("segsize", po::value<size_t>(&segsize)->default_value(1e6), "segment size for metadata segmentation. To get accurate timestamp, segment size needs to be multiple of element size(4096 by default)")
-		("starttime", po::value<std::string>(&start_time)->default_value("0"), "set up start streaming time")	  	  
+		("segsize", po::value<size_t>(&segsize)->default_value(1e6), "segment size for metadata segmentation. To get accurate timestamp, segment size needs to be multiple of element size(1024 by default)")
+		("starttime", po::value<std::string>(&start_time)->default_value("0"), "set up start streaming time (YYYY-MM-DD H:M:S)")
 		;
 	po::variables_map vm;
 	po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -617,7 +617,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 	//Get sensor names from the usrp	
 	std::vector<std::string> sensor_names = usrp->get_mboard_sensor_names(0);
 
-	//Set the computer time onto the USRP
+	//Set the USRP initial time	
 	if(std::find(sensor_names.begin(), sensor_names.end(), "gps_time") != sensor_names.end()) {
 		uhd::sensor_value_t gps_time = usrp->get_mboard_sensor("gps_time");
 		uhd::time_spec_t usrp_time(gps_time.to_real());	
@@ -628,7 +628,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 		//uhd::time_spec_t timestamp = uhd::time_spec_t::get_system_time(); 
 		time_t pc_time = time(0);       		
 		usrp->set_time_now(pc_time);
-		std::cout << "Set USRP time with UHD system time: "<< ctime(&pc_time) <<std::endl;
+		std::cout << "Set USRP time with PC system time: "<< ctime(&pc_time) <<std::endl;
 	}
     
 
