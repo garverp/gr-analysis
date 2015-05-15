@@ -278,11 +278,18 @@ template<typename samp_type> void recv_to_file(
 	} else {
 		//Set up future streaming time
 		std_start_time = UTC_to_spec_t(start_time.data());
-		//time_t to time_spec_t
-		uhd::time_spec_t usrp_time = uhd::time_spec_t(std_start_time,0);
-		stream_cmd.time_spec = usrp_time;
+		
+		//check if the future time is valid
+		if(std_start_time < std::time(NULL)) {
+			std::cout << boost::format("Invalid future streaming-time setup") << std::endl;
+			done = true;
+		} else {
+			//time_t to time_spec_t
+			uhd::time_spec_t usrp_time = uhd::time_spec_t(std_start_time,0);
+			stream_cmd.time_spec = usrp_time;
+		}
+
 	}
-	
 
 	rx_stream->issue_stream_cmd(stream_cmd);
 	//boost::system_time start = boost::get_system_time();
@@ -408,8 +415,9 @@ template<typename samp_type> void recv_to_file(
 
 	}
 	done = true;
+	//wrap up the leftover metadata writing
         pthread_cond_signal(&cond);
-	// Wait for thread to exit
+	// Wait for threads to exit
 	write_thread.join();
 	metadata_handle_thread.join(); 
 	close(fd);  
@@ -518,8 +526,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 		("int-n", "tune USRP with integer-N tuning")
 		("metadata", po::value<bool>(&metadata)->default_value(false),"enable metadata, should write =true")
 		("detachhdr", po::value<bool>(&detachhdr)->default_value(true),"enable detachhdr, true by default, set false should write = false")
-		("segsize", po::value<size_t>(&segsize)->default_value(1e6), "segment size for metadata segmentation. To get accurate timestamp, segment size needs to be multiple of element size(4096 by default)")
-		("starttime", po::value<std::string>(&start_time)->default_value("0"), "set up start streaming time")	  	  
+		("segsize", po::value<size_t>(&segsize)->default_value(1e6), "segment size for metadata segmentation. To get accurate timestamp, segment size needs to be multiple of element size(1024 by default)")
+		("starttime", po::value<std::string>(&start_time)->default_value("0"), "set up start streaming time (YYYY-MM-DD H:M:S)")
 		;
 	po::variables_map vm;
 	po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -609,16 +617,18 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 	//Get sensor names from the usrp	
 	std::vector<std::string> sensor_names = usrp->get_mboard_sensor_names(0);
 
-	//Set the computer time onto the USRP
+	//Set the USRP initial time	
 	if(std::find(sensor_names.begin(), sensor_names.end(), "gps_time") != sensor_names.end()) {
 		uhd::sensor_value_t gps_time = usrp->get_mboard_sensor("gps_time");
 		uhd::time_spec_t usrp_time(gps_time.to_real());	
        		usrp->set_time_now(usrp_time);
-                std::cout << "Set USRP with GPS time: "<< gps_time.to_real() <<std::endl;
+		time_t stdtime = gps_time.to_real();
+                std::cout << "Set USRP with GPS time: "<< ctime(&stdtime) <<std::endl;
 	} else {
-		uhd::time_spec_t timestamp = uhd::time_spec_t::get_system_time(); 
-       		usrp->set_time_now(timestamp);
-		std::cout << "Set USRP time with UHD system time: "<< timestamp.get_full_secs() <<std::endl;
+		//uhd::time_spec_t timestamp = uhd::time_spec_t::get_system_time(); 
+		time_t pc_time = time(0);       		
+		usrp->set_time_now(pc_time);
+		std::cout << "Set USRP time with PC system time: "<< ctime(&pc_time) <<std::endl;
 	}
     
 
