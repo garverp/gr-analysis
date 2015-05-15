@@ -1,8 +1,8 @@
 #!/usr/bin/python
-
 # Create a new header file (and eventually modify existing ones)
 # PWG 10.15.2014
 
+from gnuradio import gr
 from gnuradio import eng_notation
 from gnuradio import blocks
 from gnuradio.blocks import parse_file_metadata
@@ -10,6 +10,31 @@ import pmt
 import sys
 
 n2s = eng_notation.num_to_str
+
+    
+# Defining Tuple for data types: (itemsize,cpx,format)
+SC16_DEFS = (gr.sizeof_short*2,True,blocks.GR_FILE_SHORT)
+FC32_DEFS = (gr.sizeof_gr_complex,True,blocks.GR_FILE_FLOAT)
+B8_DEFS = (gr.sizeof_char,False,blocks.GR_FILE_BYTE)
+ENUM_TO_SNAME = {0:'unknown', 1:'sc16', 2:'fc32', 3:'b8'}
+SNAME_DEFS = {1:SC16_DEFS, 2:FC32_DEFS, 3:B8_DEFS}
+SNAME_TO_ENUM = {v: k for k, v in ENUM_TO_SNAME.items()}
+STRING_TO_FTYPE= {v: k for k, v in parse_file_metadata.ftype_to_string.items()}
+
+
+def find_shortname(cpx, the_type, item_size):
+    shortname_type = SNAME_TO_ENUM["unknown"]
+    the_type = STRING_TO_FTYPE[the_type]
+    # Interleaved Short
+    if cmp(SNAME_DEFS[1], (item_size, cpx, the_type)) == 0:
+        return SNAME_TO_ENUM["sc16"]
+    # Complex Float
+    if cmp(SNAME_DEFS[2], (item_size, cpx, the_type)) == 0:
+        return SNAME_TO_ENUM["fc32"]
+    # Bytes
+    if cmp(SNAME_DEFS[3], (item_size, cpx, the_type)) == 0:
+        return SNAME_TO_ENUM["b8"]
+    return shortname_type
 
 def update_timestamp(hdr,seg_size):
     if pmt.dict_has_key(hdr, pmt.string_to_symbol("rx_time")):
@@ -40,32 +65,24 @@ def make_header(options, filename):
     extras_present = False
     if options.freq is not None:
         extras_present = True
-
     # Open the file and make the header
     hdr_filename = filename + '.hdr'
     hdr_file = open(hdr_filename, 'wb')
     header = pmt.make_dict()
-   
     # Fill in header vals
     # TODO - Read this from blocks.METADATA_VERSION
     ver_val = pmt.from_long(long(0))
     rate_val = pmt.from_double(options.sample_rate)
     time_val = pmt.make_tuple(pmt.from_uint64(options.time_sec),
                              pmt.from_double(options.time_fsec))
-    #samp_num = rate_val*time_val
-    # Interpret the size
     ft_to_sz = parse_file_metadata.ftype_to_size
-    ft_to_str = parse_file_metadata.ftype_to_string
-    fmt = [fmt for fmt, value in ft_to_str.items() if value == options.format][0]
-    size_val = pmt.from_long(ft_to_sz[fmt])
-    type_val = pmt.from_long(fmt)
-    cplx_val = pmt.from_bool(not options.real)
-    if not options.real:
-        ft_to_sz[fmt] = 2*ft_to_sz[fmt]
-        size_val = pmt.from_long(ft_to_sz[fmt])
-    #samp_len = long(options.length*ft_to_sz[fmt])
-    #bytes_val = pmt.from_uint64(samp_len)
-    #bytes_val_int = pmt.to_python(bytes_val)
+    # Map shortname to properties
+    enum_type = SNAME_TO_ENUM[options.format]
+    type_props = SNAME_DEFS[enum_type]
+    size_val = pmt.from_long(type_props[0])
+    cplx_val = pmt.from_bool(type_props[1])
+    type_val = pmt.from_long(type_props[2])
+    fmt = type_props[2]
     file_samp_len = long(options.length)
     seg_size = long(options.seg_size)
     bytes_val = pmt.from_uint64(long(seg_size*ft_to_sz[fmt]))

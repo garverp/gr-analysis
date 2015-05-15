@@ -20,7 +20,7 @@ def get_options():
            help="Verbose Output")
     parser.add_option("-t", "--output-type", type="choice", default="unknown",
             choices=filetrunc.SNAME_TO_ENUM.keys(), help="Output data type. \
-                     [sc16|fc32] Default is same as input")
+                     [sc16|fc32|b8] Default is same as input")
                      
     (options, args) = parser.parse_args()
     if len(args) != 2:

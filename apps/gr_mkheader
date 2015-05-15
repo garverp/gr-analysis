@@ -2,9 +2,13 @@
 
 # Create a new header file (and eventually modify existing ones)
 # PWG 10.15.2014
+from gnuradio import gr
+from gnuradio import blocks
+from gnuradio import eng_notation
 from analysis import mkheader
 from gnuradio.eng_option import eng_option
 from optparse import OptionParser
+
 
 def get_options():
     usage = "%prog: [options] header_filename"
@@ -17,12 +21,9 @@ def get_options():
                      help="Whole Second Timestamp [default=%default]")
     parser.add_option("-s", "--time-fsec", type="eng_float", default=0.0,
                      help="Fractional Sec Timestamp [default=%default]")
-    parser.add_option("-t", "--format", type="choice", default="short",
-                     choices=['bytes', 'short', 'int', 'long', 'long long',
-                         'float', 'double',],
+    parser.add_option("-t", "--format", type="choice", default="sc16",
+                     choices=['b8','fc32','sc16'],
                      help="Item data type [default=%default]")
-    parser.add_option("-R", "--real", action="store_true", dest="real",
-            default=False, help="Data is real [default=%default]")
     parser.add_option("-l", "--length", type="eng_float", default=1e6,
                      help="Length of Data in samples [default=%default]")
     parser.add_option("-f", "--freq", type="eng_float",
