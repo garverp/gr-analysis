@@ -19,12 +19,11 @@
 install(FILES
     #
     #
-    #analysis_file_meta_sink.xml
-    #
-    #
-    #analysis_file_meta_sink.xml
-    #
+    ##
     #
     #analysis_file_meta_sink.xml
-    analysis_stream_max.xml DESTINATION share/gnuradio/grc/blocks
+    #
+    #
+    #analysis_file_meta_sink.xml
+    DESTINATION share/gnuradio/grc/blocks
 )

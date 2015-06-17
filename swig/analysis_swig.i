@@ -9,12 +9,9 @@
 
 %{
 //////#include "analysis/file_meta_sink.h"
-#include "analysis/stream_max.h"
 %}
 
 
 //////%include "analysis/file_meta_sink.h"
 //////GR_SWIG_BLOCK_MAGIC2(analysis, file_meta_sink);
 
-%include "analysis/stream_max.h"
-GR_SWIG_BLOCK_MAGIC2(analysis, stream_max);

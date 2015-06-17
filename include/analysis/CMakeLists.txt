@@ -24,12 +24,11 @@ install(FILES
     api.h
     #
     #
-    #file_meta_sink.h
-    #
-    #
-    #file_meta_sink.h
-    #
+    ##
     #
     #file_meta_sink.h
-    stream_max.h DESTINATION include/analysis
+    #
+    #
+    #file_meta_sink.h
+    DESTINATION include/analysis
 )
