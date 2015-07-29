@@ -90,13 +90,21 @@ find_package(Doxygen)
 # components required to the list of GR_REQUIRED_COMPONENTS (in all
 # caps such as FILTER or FFT) and change the version to the minimum
 # API compatible version required.
-set(GR_REQUIRED_COMPONENTS RUNTIME)
+set(GR_REQUIRED_COMPONENTS RUNTIME PMT)
 find_package(Gnuradio "3.7.2" REQUIRED)
 
 if(NOT CPPUNIT_FOUND)
     message(FATAL_ERROR "CppUnit required to compile analysis")
 endif()
 
+find_package(UHD)
+if(NOT UHD_FOUND)
+   message(FATAL_ERROR "uhd required to compile analysis")
+endif()
+
+
+message(STATUS "gr_include_path=${GNURADIO_ALL_INCLUDE_DIRS}")
+message(STATUS "gr_library_path=${GNURADIO_ALL_LIBRARIES}")
 ########################################################################
 # Setup doxygen option
 ########################################################################
