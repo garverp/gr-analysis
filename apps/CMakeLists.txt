@@ -26,7 +26,7 @@ add_subdirectory(matlab)
 GR_PYTHON_INSTALL(
     PROGRAMS
     gr_mkheader
-    gr_filetrunc
+    gr_fileman
     read_file_metadata
     DESTINATION ${GR_RUNTIME_DIR}
 )

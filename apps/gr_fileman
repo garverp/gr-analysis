@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # Selects a subset of samples out of pre-recorded data
 # Support for headers
-from analysis import filetrunc
+from analysis import fileman
 from optparse import OptionParser
 from gnuradio.eng_option import eng_option
 
@@ -19,7 +19,7 @@ def get_options():
     parser.add_option("-v", "--verbose", action="store_true", default=False,
            help="Verbose Output")
     parser.add_option("-t", "--output-type", type="choice", default="unknown",
-            choices=filetrunc.SNAME_TO_ENUM.keys(), help="Output data type. \
+            choices=fileman.SNAME_TO_ENUM.keys(), help="Output data type. \
                      [sc16|fc32|b8] Default is same as input")
                      
     (options, args) = parser.parse_args()
@@ -30,4 +30,4 @@ def get_options():
 
 if __name__ == '__main__':
     (options, args) = get_options()
-    filetrunc.truncate_file(options,args)
+    fileman.truncate_file(options,args)
