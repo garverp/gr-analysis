@@ -158,6 +158,11 @@ add_subdirectory(swig)
 add_subdirectory(python)
 add_subdirectory(grc)
 add_subdirectory(apps)
+add_subdirectory(apps/matlab)
+# Specrec only compiles under Linux
+if("${CMAKE_SYSTEM}" MATCHES "Linux")
+   add_subdirectory(apps/record)
+endif()
 add_subdirectory(docs)
 
 ########################################################################

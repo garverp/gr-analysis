@@ -18,11 +18,6 @@
 # Boston, MA 02110-1301, USA.
 
 include(GrPython)
-
-add_subdirectory(record)
-add_subdirectory(matlab)
-
-
 GR_PYTHON_INSTALL(
     PROGRAMS
     gr_mkheader
