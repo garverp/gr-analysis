@@ -618,7 +618,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 	std::vector<std::string> sensor_names = usrp->get_mboard_sensor_names(0);
 
 	//Set the USRP initial time	
-	if(std::find(sensor_names.begin(), sensor_names.end(), "gps_locked") != sensor_names.end()) {              uhd::sensor_value_t gps_locked = usrp->get_mboard_sensor("gps_locked",0);
+	if(std::find(sensor_names.begin(), sensor_names.end(), "gps_locked") != sensor_names.end()) {              
+			uhd::sensor_value_t gps_locked = usrp->get_mboard_sensor("gps_locked",0);
 		if( gps_locked.to_bool() ){
 			uhd::sensor_value_t gps_time = usrp->get_mboard_sensor("gps_time");
 			uhd::time_spec_t usrp_time(gps_time.to_real());	
