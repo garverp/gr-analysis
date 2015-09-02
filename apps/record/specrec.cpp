@@ -619,19 +619,29 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 	std::vector<std::string> sensor_names = usrp->get_mboard_sensor_names(0);
 
 	//Set the USRP initial time	
-	if(std::find(sensor_names.begin(), sensor_names.end(), "gps_time") != sensor_names.end()) {
-		uhd::sensor_value_t gps_time = usrp->get_mboard_sensor("gps_time");
-		uhd::time_spec_t usrp_time(gps_time.to_real());	
-       		usrp->set_time_now(usrp_time);
-		time_t stdtime = gps_time.to_real();
-                std::cout << "Set USRP with GPS time: "<< ctime(&stdtime) <<std::endl;
+	if(std::find(sensor_names.begin(), sensor_names.end(), "gps_locked") != sensor_names.end()) {              
+			uhd::sensor_value_t gps_locked = usrp->get_mboard_sensor("gps_locked",0);
+		if( gps_locked.to_bool() ){
+			uhd::sensor_value_t gps_time = usrp->get_mboard_sensor("gps_time");
+			uhd::time_spec_t usrp_time(gps_time.to_real());	
+			usrp->set_time_now(usrp_time);
+			time_t stdtime = gps_time.to_real();
+			std::cout << "Set USRP with GPS time: "<< ctime(&stdtime) <<std::endl;
+		}else{
+			std::cout << "Found GPSDO but no GPS lock, setting usrp time to system time" << std::endl;
+			time_t pc_time = time(0);       		
+			usrp->set_time_now(pc_time);
+			std::cout << "Set USRP time with PC system time: "<< ctime(&pc_time) <<std::endl;
+
+
+		}
 	} else {
 		//uhd::time_spec_t timestamp = uhd::time_spec_t::get_system_time(); 
 		time_t pc_time = time(0);       		
 		usrp->set_time_now(pc_time);
 		std::cout << "Set USRP time with PC system time: "<< ctime(&pc_time) <<std::endl;
 	}
-    
+
 
 	if (total_num_samps == 0){
 		std::signal(SIGINT, &sig_int_handler);
