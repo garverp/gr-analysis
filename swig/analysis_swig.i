@@ -15,3 +15,6 @@
 //////%include "analysis/file_meta_sink.h"
 //////GR_SWIG_BLOCK_MAGIC2(analysis, file_meta_sink);
 
+%include "analysis/statistics.h"
+GR_SWIG_BLOCK_MAGIC2(analysis, statistics);
+#include "analysis/statistics.h"
