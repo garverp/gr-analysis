@@ -29,9 +29,10 @@ namespace gr {
     class statistics_impl : public statistics
     {
      private:
-      gr_complex max_val,min_val;
-      gr_complex mean,M2;
+      double max_val,min_val;
+      double mean,M2;
       uint64_t max_index,min_index;
+      uint64_t n;
 
      public:
       statistics_impl();

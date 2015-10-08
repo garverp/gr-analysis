@@ -50,6 +50,7 @@ namespace gr {
        min_val = 0;
        mean = 0;
        M2 = 0;
+       n=1;
     }
 
     /*
@@ -57,6 +58,8 @@ namespace gr {
      */
     statistics_impl::~statistics_impl()
     {
+        std::cout << "mag mean=" << mean << std::endl;
+        std::cout << "mag var=" << M2/double(n-2)<< std::endl;
     }
 
     int
@@ -72,24 +75,27 @@ namespace gr {
         // Recommendations" Tony F. Chan et al. American Statistician
         // S_1 = 0, M_1 = x_1 = x[0]
         if( nitems_written(0) == 0 ){
-           mean = in[0];
+           mean = abs(in[0]);
            out[0] = in[0];
+           //std::cout<<"First Iteration: mean=" << mean << "sum=" << M2 << std::endl;
+           n++;
            return 1;
         }
-        gr_complex n = gr_complex(nitems_written(0)+1);
-        gr_complex nm1 = n-gr_complex(1);
-        gr_complex delta = 0.0;
-        gr_complex deltaovern = 0.0;
+        double delta = 0.0;
+        double deltaovern = 0.0;
         for( int i = 0; i < noutput_items; i++ ){
-           delta = in[i]-mean;
-           deltaovern=delta/n;
+           delta = abs(in[i])-mean;
+           deltaovern=delta/double(n);
+           /**
+           std::cout << "n,delta,delta/n=" << n << "," << delta 
+                     << "," << deltaovern << std::endl;**/
            // or pow(delta,2) faster?
-           M2 += nm1*delta*deltaovern;
+           M2 += double(n-1)*delta*deltaovern;
+           // Calc M_n
            mean += deltaovern;
+           out[i] = in[i];
+           n++;
         }
-        std::cout << "mean=" << mean << std::endl;
-        std::cout << "var=" << M2/(n-gr_complex(1)) << std::endl;
-
         // Tell runtime system how many output items we produced.
         return noutput_items;
     }
