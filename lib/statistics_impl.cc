@@ -58,9 +58,12 @@ namespace gr {
      */
     statistics_impl::~statistics_impl()
     {
+        double mag_var = M2/double(n-2);
+        std::cout << "----------Statistics-------" << std::endl;
         std::cout << "mag mean=" << mean << std::endl;
-        std::cout << "mag var=" << M2/double(n-2) << std::endl;
-        std::cout << "mag max=" << max_val << " @" << max_index << std::endl;
+        std::cout << "mag var=" << mag_var << std::endl;
+        std::cout << "mag stddev=" << sqrt(mag_var) << std::endl;
+        std::cout << "mag max=" << max_val << " @ " << max_index << std::endl;
         std::cout << "mag min=" << min_val << " @ " << min_index << std::endl;
     }
 
