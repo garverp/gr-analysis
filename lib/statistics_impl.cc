@@ -59,7 +59,9 @@ namespace gr {
     statistics_impl::~statistics_impl()
     {
         std::cout << "mag mean=" << mean << std::endl;
-        std::cout << "mag var=" << M2/double(n-2)<< std::endl;
+        std::cout << "mag var=" << M2/double(n-2) << std::endl;
+        std::cout << "mag max=" << max_val << " @" << max_index << std::endl;
+        std::cout << "mag min=" << min_val << " @ " << min_index << std::endl;
     }
 
     int
@@ -75,7 +77,10 @@ namespace gr {
         // Recommendations" Tony F. Chan et al. American Statistician
         // S_1 = 0, M_1 = x_1 = x[0]
         if( nitems_written(0) == 0 ){
-           mean = abs(in[0]);
+           double in_mag = abs(in[0]);
+           mean = in_mag;
+           min_val = in_mag;
+           max_val = in_mag;
            out[0] = in[0];
            //std::cout<<"First Iteration: mean=" << mean << "sum=" << M2 << std::endl;
            n++;
@@ -83,13 +88,20 @@ namespace gr {
         }
         double delta = 0.0;
         double deltaovern = 0.0;
+        double in_mag = 0.0;
         for( int i = 0; i < noutput_items; i++ ){
-           delta = abs(in[i])-mean;
+           in_mag = abs(in[i]);
+           if( in_mag > max_val ){
+              max_val = in_mag;
+              max_index = i + nitems_read(0);
+           }
+           if( in_mag < min_val ){
+              min_val = in_mag;
+              min_index = i + nitems_read(0);
+           }
+           delta = in_mag-mean;
            deltaovern=delta/double(n);
-           /**
-           std::cout << "n,delta,delta/n=" << n << "," << delta 
-                     << "," << deltaovern << std::endl;**/
-           // or pow(delta,2) faster?
+           // Is pow() faster?
            M2 += double(n-1)*delta*deltaovern;
            // Calc M_n
            mean += deltaovern;
