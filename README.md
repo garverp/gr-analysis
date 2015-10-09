@@ -7,11 +7,12 @@ Tools for High Sample Rate Recording and Post-Processing in GNURadio
 + gr_mkheader: Generate headers for data which previously had none
 + gr_fstat: Compute statistics of .sc16 and .fc32 files (mean,var,max,min)
 + read_file_metadata: Display metadata headers in human-readable format
-## Installation
-   git clone https://github.gatech.edu/idc/gr-analysis.git
-   cd gr-analysis
-   mkdir build && cd build
-   cmake ../
-   make
-   sudo make install
-   sudo ldconfig
+
+### Installation
+<pre>git clone https://github.gatech.edu/idc/gr-analysis.git
+cd gr-analysis
+mkdir build && cd build
+cmake ../
+make
+sudo make install
+sudo ldconfig</pre>
