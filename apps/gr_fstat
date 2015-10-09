@@ -1,0 +1,85 @@
+#!/usr/bin/env python2
+# Perform some basic statistics on files
+from gnuradio import blocks
+from gnuradio import eng_notation
+from gnuradio import gr
+from gnuradio.eng_option import eng_option
+from gnuradio.filter import firdes
+from optparse import OptionParser
+import analysis
+
+
+class fstat(gr.top_block):
+   def __init__(self, filename="file.sc16", offset=0, sc16=False):
+      gr.top_block.__init__(self, "Fstat")
+
+        ##################################################
+        # Parameters
+        ##################################################
+      self.filename = filename
+      self.offset = offset
+      self.sc16 = sc16
+
+        ##################################################
+        # Variables
+        ##################################################
+
+        # Non-Type Specific Blocks
+      self.blocks_skiphead_0 = blocks.skiphead(gr.sizeof_gr_complex*1, offset)
+      self.blocks_null_sink_0 = blocks.null_sink(gr.sizeof_gr_complex*1)
+      self.analysis_statistics_0 = analysis.statistics()
+        ##################################################
+        # sc16 
+        ##################################################
+      if self.sc16 == True:
+         # Blocks
+         self.blocks_file_source_0 = blocks.file_source(gr.sizeof_short*1, filename, False)
+         self.blocks_interleaved_short_to_complex_0 = blocks.interleaved_short_to_complex(False, False)
+         # Connections
+         self.connect((self.blocks_file_source_0, 0), (self.blocks_interleaved_short_to_complex_0, 0))    
+         self.connect((self.blocks_interleaved_short_to_complex_0, 0), (self.blocks_skiphead_0, 0))    
+
+        ##################################################
+        # fc32
+        ##################################################
+      else:
+        # Blocks
+         self.blocks_file_source_0 = blocks.file_source(gr.sizeof_gr_complex*1, filename, False)
+           # Connections
+         self.connect((self.blocks_file_source_0,0),(self.blocks_skiphead_0,0))
+      # Non-Type Specific Connections
+      self.connect((self.blocks_skiphead_0,0),(self.analysis_statistics_0,0));
+      self.connect((self.analysis_statistics_0, 0), (self.blocks_null_sink_0, 0))    
+
+      def get_filename(self):
+         return self.filename
+
+      def set_filename(self, filename):
+         self.filename = filename
+         self.blocks_file_source_0.open(self.filename, False)
+
+      def get_offset(self):
+         return self.offset
+
+      def set_offset(self, offset):
+         self.offset = offset
+
+      def set_sc16(self,sc16):
+         self.sc16 = sc16
+
+      def get_sc16(self):
+         return self.sc16
+
+
+if __name__ == '__main__':
+   parser = OptionParser(option_class=eng_option, usage="%prog: [options]")
+   parser.add_option("-f", "--filename", dest="filename", type="string", default="file.fc32",
+   help="Set file.sc16 [default=%default]")
+   parser.add_option("-o", "--offset", dest="offset", type="long", default=0,
+   help="Set offset [default=%default]")
+   parser.add_option("-s",action="store_true",dest="sc16",default=False,
+   help="File is interleaved shorts (sc16),not complex (fc32) [default=%default]")
+   (options, args) = parser.parse_args()
+   tb = fstat(filename=options.filename, offset=options.offset,sc16=options.sc16)
+   tb.start()
+   tb.wait()
