@@ -22,6 +22,7 @@ GR_PYTHON_INSTALL(
     PROGRAMS
     gr_mkheader
     gr_fileman
+    gr_fstat
     read_file_metadata
     DESTINATION ${GR_RUNTIME_DIR}
 )

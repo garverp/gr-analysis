@@ -25,5 +25,5 @@ install(FILES
     #
     #
     #analysis_file_meta_sink.xml
-    DESTINATION share/gnuradio/grc/blocks
+    analysis_statistics.xml DESTINATION share/gnuradio/grc/blocks
 )

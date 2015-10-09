@@ -30,5 +30,5 @@ install(FILES
     #
     #
     #file_meta_sink.h
-    DESTINATION include/analysis
+    statistics.h DESTINATION include/analysis
 )
