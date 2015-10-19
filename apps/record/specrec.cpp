@@ -201,7 +201,7 @@ std::time_t UTC_to_spec_t(const char *buffer){
 	//utc to time_t	
 	std::time_t std_time = mktime(&newtime);
 	//Print out starting time in future
-	std::cout << "\nStart time: "<< ctime(&std_time) << std::endl;
+	std::cout << "\nRequested Start time: "<< ctime(&std_time) << std::endl;
 	
 	return std_time;
 }
@@ -263,17 +263,21 @@ template<typename samp_type> void recv_to_file(
 	printf("Elements are %d bytes, %zu samples/element, %zu elements in circular buffer\n",CB_ELEMENT_SIZE,samps_per_element,cbcapacity);
 	circbuff_element_t read_ele;
 	//setup streaming
-        if( num_requested_samples == 0 ){
-           if( time_requested != 0){
-              num_requested_samples = time_requested*usrp->get_rx_rate();
-           }
-        }
+        // STREAM_MODE_NUM_SAMPS_AND_DONE has a limit of 10.7s @ 25MSPS 
+	// so num_requested_samples must be < 268435455 to use this mode
+	// If given a time to record, calculated num_requested_samples
+	// based on the sample rate
 	uhd::stream_cmd_t stream_cmd((num_requested_samples == 0)?
 			uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS:
 			uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE
 			);
-
-	stream_cmd.num_samps = num_requested_samples;
+	if( num_requested_samples == 0 ){
+           if( time_requested != 0){
+              num_requested_samples = time_requested*usrp->get_rx_rate();
+	   }
+        }else{
+	   stream_cmd.num_samps = num_requested_samples;
+	}
 	stream_cmd.stream_now = false;
 
 	std::time_t std_start_time = std::time(NULL);
@@ -331,7 +335,7 @@ template<typename samp_type> void recv_to_file(
 				samps_per_element, md,3.0, enable_size_map);
 
                 if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
-			std::cout << ".";
+			std::cout << "." << std::flush;
 			continue;
 		}else{
 		  circbuff_notfull = buff.push_with_haste(read_ele);
@@ -339,7 +343,7 @@ template<typename samp_type> void recv_to_file(
                   if( start_stream == false ){
                      start_stream = true;
                      time_t sstream_time = md.time_spec.get_full_secs();
-                     std::cout << "Start streaming at" << sstream_time << std::endl;
+                     std::cout << "Start streaming at: " << ctime(&sstream_time) << std::endl;
                   }
                 }
 
@@ -379,8 +383,13 @@ template<typename samp_type> void recv_to_file(
 		}
 
 		num_total_samps += num_rx_samps;
+		if( num_total_samps >= num_requested_samples ){
+			done = true;
+		}
 		if( num_rx_samps != samps_per_element ){
-			printf("Only got %zu/%zu samples\n",num_rx_samps,samps_per_element);
+			if( num_total_samps < num_requested_samples ){
+				printf("Only got %zu/%zu samples\n",num_rx_samps,samps_per_element);
+			}
 		}
 		
 		if(detachhdr && metadata) {
@@ -499,7 +508,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 		("args", po::value<std::string>(&args)->default_value(""), "multi uhd device address args")
 		("file", po::value<std::string>(&file)->default_value("usrp_samples.dat"), "name of the file to write binary samples to")
 		("type", po::value<std::string>(&type)->default_value("short"), "sample type: double, float, or short")
-		("nsamps", po::value<size_t>(&total_num_samps)->default_value(0), "total number of samples to receive")
+		("nsamps", po::value<size_t>(&total_num_samps)->default_value(0), "total number of samples to receive (< 268435455)")
 		("time", po::value<double>(&total_time)->default_value(0), "total number of seconds to receive")
 		("cbcapacity", po::value<size_t>(&cbcapacity)->default_value(4096), "Elements per Circular Buffer")
 		("rate", po::value<double>(&rate)->default_value(1e6), "rate of incoming samples")
@@ -518,9 +527,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 		("continue", "don't abort on a bad packet")
 		("skip-lo", "skip checking LO lock status")
 		("int-n", "tune USRP with integer-N tuning")
-		("metadata", po::value<bool>(&metadata)->default_value(false),"enable metadata, should write =true")
+		("metadata", po::value<bool>(&metadata)->default_value(true),"enable metadata, should write =true")
 		("detachhdr", po::value<bool>(&detachhdr)->default_value(true),"enable detachhdr, true by default, set false should write = false")
-		("segsize", po::value<size_t>(&segsize)->default_value(1e6), "segment size for metadata segmentation. To get accurate timestamp, segment size needs to be multiple of element size(1024 by default)")
+		("segsize", po::value<size_t>(&segsize)->default_value(24999936), "segment size for metadata segmentation. To get accurate timestamp, segment size needs to be multiple of element size(1024 by default)")
 		("starttime", po::value<std::string>(&start_time)->default_value("0"), "set up start streaming time (YYYY-MM-DD H:M:S)")
 		;
 	po::variables_map vm;
@@ -541,6 +550,12 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 
 	if (enable_size_map)
 		std::cout << "Packet size tracking enabled - will only recv one packet at a time!" << std::endl;
+
+	// Check number of samples
+	if( total_num_samps >= 268435455 ){
+		std::cerr << "Error: --nsamps < 268435455" << std::endl;
+		return ~0;
+	}
 
 	//create a usrp device
 	std::cout << std::endl;
