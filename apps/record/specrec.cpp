@@ -151,7 +151,7 @@ void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t t
 	//std::cout << std::endl << header_str.size() <<std::endl;
 	// Using lock to avoid collisions with sample writing.
         if(!detachhdr){	pthread_mutex_lock(&mtx);}
-	write(fd,header_str.c_str(),header_str.size());
+	ssize_t nwritten = write(fd,header_str.c_str(),header_str.size());
         if(!detachhdr){pthread_mutex_unlock(&mtx);}
 }
 
@@ -260,18 +260,24 @@ template<typename samp_type> void recv_to_file(
 		std::cerr << "Element size " << CB_ELEMENT_SIZE << " not an integer # of samples" 
 			<< std::endl;
 	}
-	printf("Elements are %d bytes, %zu samples/element, %zu elements in \ circular buffer\n",CB_ELEMENT_SIZE,samps_per_element,cbcapacity);
+	printf("Elements are %d bytes, %zu samples/element, %zu elements in circular buffer\n",CB_ELEMENT_SIZE,samps_per_element,cbcapacity);
 	circbuff_element_t read_ele;
 	//setup streaming
+        if( num_requested_samples == 0 ){
+           if( time_requested != 0){
+              num_requested_samples = time_requested*usrp->get_rx_rate();
+           }
+        }
 	uhd::stream_cmd_t stream_cmd((num_requested_samples == 0)?
 			uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS:
 			uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE
 			);
+
 	stream_cmd.num_samps = num_requested_samples;
 	stream_cmd.stream_now = false;
-	
 
 	std::time_t std_start_time = std::time(NULL);
+        // If no future start time is specified on the command line
 	if(start_time.compare("0") ==0) {
 		//Default starting time is now
 		stream_cmd.stream_now = true;
@@ -291,13 +297,10 @@ template<typename samp_type> void recv_to_file(
 		}
 
 	}
-
+        // Configure the USRP
 	rx_stream->issue_stream_cmd(stream_cmd);
-	//boost::system_time start = boost::get_system_time();
         boost::system_time start =  boost::posix_time::from_time_t(std_start_time);
 
-	unsigned long long ticks_requested = 
-		(long)(time_requested * (double)boost::posix_time::time_duration::ticks_per_second());
 	boost::posix_time::time_duration ticks_diff;
 	boost::system_time last_update = start;
 	unsigned long long last_update_samps = 0;
@@ -319,26 +322,32 @@ template<typename samp_type> void recv_to_file(
 	//handle metadata writting
 	boost::thread metadata_handle_thread(metadata_handle,fd, fd_hdr, metadata, detachhdr, usrp, &num_total_samps, segsize, &g_timestamp); 
 
+        // Main Loop
 	while(not done and (num_requested_samples != num_total_samps 
 				or num_requested_samples == 0)){
-		boost::system_time now = boost::get_system_time();
-	//	std::cout<< to_simple_string(now) << std::endl;
 
+		boost::system_time now = boost::get_system_time();
 		size_t num_rx_samps = rx_stream->recv((samp_type*)&read_ele,
 				samps_per_element, md,3.0, enable_size_map);
 
-		circbuff_notfull = buff.push_with_haste(read_ele);
-		num_elements.inc();
+                if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
+			std::cout << ".";
+			continue;
+		}else{
+		  circbuff_notfull = buff.push_with_haste(read_ele);
+		  num_elements.inc();
+                  if( start_stream == false ){
+                     start_stream = true;
+                     time_t sstream_time = md.time_spec.get_full_secs();
+                     std::cout << "Start streaming at" << sstream_time << std::endl;
+                  }
+                }
+
 		if( !circbuff_notfull ){
 			std::cerr << "Circular buffer is FULL!" << std::endl;
 			done = true;
 		}
-		if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
-			std::cout << "Time out" << std::endl;
-			continue;
-			//std::cout << boost::format("Timeout while streaming") << std::endl;
-			//break;
-		}
+		
 		if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_OVERFLOW){
 			if (overflow_message){
 				overflow_message = false;
@@ -383,7 +392,6 @@ template<typename samp_type> void recv_to_file(
 			}
 		}
 		
-		
 		if (bw_summary){
 			last_update_samps += num_rx_samps;
 			boost::posix_time::time_duration update_diff = now - last_update;
@@ -398,22 +406,7 @@ template<typename samp_type> void recv_to_file(
 				last_update = now;
 			}
 		}
-
-		now = boost::get_system_time();
-		ticks_diff = now - start;
-		//Print out message if future streaming time reached
-		if(ticks_diff.ticks() >= 0 && !start_stream) {
-			std::cout << "Starting streaming..." << std::endl;
-			std::cout << now << std::endl;
-			start_stream =true;
-		}
-
-		if (ticks_requested > 0 && start_stream){
-			if ((unsigned long long)ticks_diff.ticks() > ticks_requested) {					
-				break;
-			}
-		}
-
+                ticks_diff = now - start;
 	}
 	done = true;
 	//wrap up the leftover metadata writing
