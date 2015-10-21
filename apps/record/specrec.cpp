@@ -204,11 +204,9 @@ template<typename samp_type> void recv_to_file(
 		bool enable_size_map = false,
 		bool continue_on_bad_packet = false,
 		bool metadata = false,
-		bool detachhdr = true,
-		double gps_pc_deltat_s = 0.0
+		bool detachhdr = true
 		){
 	unsigned long long num_total_samps = 0;
-	boost::posix_time::time_duration gps_pc_deltat = boost::posix_time::seconds(gps_pc_deltat_s);
 	//create a receive streamer
 	uhd::stream_args_t stream_args(cpu_format,wire_format);
 	uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
@@ -225,7 +223,7 @@ template<typename samp_type> void recv_to_file(
 	// = (expected number of seconds for record + guard)*pc_ticks_per_second
 	unsigned long long max_ticks = 0;
 	// Guard time in case PC tick right is slightly off
-	const double guard = 1.0;
+	const double guard = 5.0;
 
 	if( (fd = open(file.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NONBLOCK, 
 					S_IRWXU|S_IRWXG|S_IRWXO)) < 0 ){
@@ -273,6 +271,7 @@ template<typename samp_type> void recv_to_file(
 	      max_ticks = (long)((time_requested+guard)*(double)boost::posix_time::time_duration::ticks_per_second());
 	   }
 	   // If nsamps or time arg not given, use ctrl+c to exit
+	   // num_samps_to_get = 0
 	// non-zero num_requested_samples
         }else{
 	   stream_cmd.num_samps = num_requested_samples;
@@ -323,6 +322,9 @@ template<typename samp_type> void recv_to_file(
 	//The counter is used for multiple segment metadata checking.   
 	unsigned long long seg_counter = 1;
 
+	// Track when recording started in PC time
+	boost::system_time pc_start_time;
+
 	//Gloable variable timestamp for metadata update
 	uhd::time_spec_t g_timestamp = uhd::time_spec_t();
 
@@ -343,8 +345,9 @@ template<typename samp_type> void recv_to_file(
 		  num_elements.inc();
                   if( start_stream == false ){
                      start_stream = true;
+		     pc_start_time = now;
                      time_t sstream_time = md.time_spec.get_full_secs();
-                     std::cout << "Start streaming at: " << ctime(&sstream_time) << std::endl;
+                     std::cout << "Start streaming at USRP Time: " << ctime(&sstream_time) << std::endl;
                   }
                 }
 
@@ -417,8 +420,8 @@ template<typename samp_type> void recv_to_file(
 				last_update = now;
 			}
 		}
-                ticks_diff = now - start - gps_pc_deltat;
-		if( (unsigned long long)ticks_diff.ticks() > max_ticks ){
+                ticks_diff = now - pc_start_time;
+		if( (unsigned long long)ticks_diff.ticks() > max_ticks && num_samps_to_get != 0){
 			std::cerr << "Max recording time exceeded" << std::endl;
 			break;
 		}
@@ -644,17 +647,11 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 			usrp->set_time_now(usrp_time);
 			time_t stdtime = gps_time.to_real();
 			std::cout << "Set USRP with GPS time: "<< ctime(&stdtime) <<std::endl;
-			// Compute delta between GPS time and PC time
-			time_t pc_time = time(0);
-			gps_pc_deltat_s = difftime(pc_time,stdtime);
-			std::cout << "GPS time - PC time (s):" << gps_pc_deltat_s << std::endl;
 		}else{
 			std::cout << "Found GPSDO but no GPS lock, setting usrp time to system time" << std::endl;
 			time_t pc_time = time(0);       		
 			usrp->set_time_now(pc_time);
 			std::cout << "Set USRP time with PC system time: "<< ctime(&pc_time) <<std::endl;
-
-
 		}
 	} else {
 		//uhd::time_spec_t timestamp = uhd::time_spec_t::get_system_time(); 
@@ -670,7 +667,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 
 #define recv_to_file_args(format) \
 	(usrp, format, wirefmt, file, start_time, cbcapacity, total_num_samps,segsize, total_time, bw_summary, \
-	 stats, null, enable_size_map, continue_on_bad_packet,metadata,detachhdr,gps_pc_deltat_s)
+	 stats, null, enable_size_map, continue_on_bad_packet,metadata,detachhdr)
 	//recv to file
 	if (type == "double") recv_to_file<std::complex<double> >recv_to_file_args("fc64");
 	else if (type == "float") recv_to_file<std::complex<float> >recv_to_file_args("fc32");
