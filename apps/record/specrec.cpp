@@ -44,7 +44,9 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 //int create_metadata_header(char * header, double samp_rate, double freq, double gain);
-std::string create_metadata_header( double samp_rate, double freq, double gain, uhd::time_spec_t timestamp, unsigned long long segment_samps_size, unsigned long long item_num);
+std::string create_metadata_header( double samp_rate, double freq, double gain, 
+	uhd::time_spec_t timestamp, unsigned long long segment_samps_size, 
+	unsigned long long item_num);
 #define METADATA_HEADER_SIZE 149
 #define CB_ELEMENT_SIZE 4096
 
@@ -85,32 +87,9 @@ void usrp_write_samples_to_file(int fd,
 	}
 }
 
-// METADATA
-/*
-   int create_metadata_header(char * headerC, double samp_rate, double freq, double gain) {
-// use GNU Radio's PMT methods to construct the header	
-const char METADATA_VERSION = 0x0;
-int headerSize;
-pmt::pmt_t header;
-header = pmt::make_dict();
-header = pmt::dict_add(header, pmt::mp("version"), pmt::mp(METADATA_VERSION));
-header = pmt::dict_add(header, pmt::mp("rx_rate"), pmt::mp(samp_rate));
-header = pmt::dict_add(header, pmt::mp("rx_time"), pmt::PMT_F);//timestamp);
-header = pmt::dict_add(header, pmt::mp("size"), pmt::from_long(2));
-header = pmt::dict_add(header, pmt::mp("type"), pmt::from_long(1));
-header = pmt::dict_add(header, pmt::mp("cplx"), pmt::PMT_F);
-header = pmt::dict_add(header, pmt::mp("strt"), pmt::from_uint64(METADATA_HEADER_SIZE+0));
-header = pmt::dict_add(header, pmt::mp("bytes"), pmt::from_uint64(0));
-std::string hdr_str = pmt::serialize_str(header);
-headerSize = hdr_str.size();	
-std::cout << header;
-std::cout << hdr_str;
-
-// write the header string into a C-style string, returning the size of the str
-std::strcpy (headerC, hdr_str.c_str());
-return headerSize;
-}*/
-std::string create_metadata_header( double samp_rate, double freq, double gain, uhd::time_spec_t timestamp,unsigned long long segment_samps_size, unsigned long long item_num) {
+std::string create_metadata_header( double samp_rate, double freq, double gain, 
+	uhd::time_spec_t timestamp,unsigned long long segment_samps_size, 
+	unsigned long long item_num) {
 	// use GNU Radio's PMT methods to construct the header	
 	const char METADATA_VERSION = 0x0;
 	int headerSize;  
@@ -128,18 +107,19 @@ std::string create_metadata_header( double samp_rate, double freq, double gain, 
 	header = pmt::dict_add(header, pmt::mp("size"), pmt::from_long(4));
 	header = pmt::dict_add(header, pmt::mp("type"), pmt::from_long(1));
 	header = pmt::dict_add(header, pmt::mp("cplx"), pmt::PMT_T);
-	header = pmt::dict_add(header, pmt::mp("rx_time"), pmt::make_tuple(pmt::from_uint64(timestamp.get_full_secs()), pmt::from_double(timestamp.get_frac_secs()) ));//timestamp);
+	header = pmt::dict_add(header, pmt::mp("rx_time"), 
+	pmt::make_tuple(pmt::from_uint64(timestamp.get_full_secs()), 
+	pmt::from_double(timestamp.get_frac_secs()) ));
 	header = pmt::dict_add(header, pmt::mp("rx_rate"), pmt::mp(samp_rate));
 	header = pmt::dict_add(header, pmt::mp("bytes"), pmt::from_uint64(4*segment_samps_size));
 	header = pmt::dict_add(header, pmt::mp("strt"), pmt::from_uint64(METADATA_HEADER_SIZE+ext_str.size()));
-
-
 	std::string hdr_str = pmt::serialize_str(header);
-//	std::cout << hdr_str + ext_str;
 	return hdr_str + ext_str;
 }
 
-void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t timestamp, unsigned long long segment_samps_size, bool detachhdr, unsigned long long item_num) {
+void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, 
+	uhd::time_spec_t timestamp, unsigned long long segment_samps_size, 
+	bool detachhdr, unsigned long long item_num) {
 
 	// METADATA - write one header at beginning of file
 	char header[METADATA_HEADER_SIZE];
@@ -147,7 +127,8 @@ void write_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec_t t
 	std::string header_str;
 	//uhd::time_spec_t timestamp = uhd::time_spec_t::get_system_time(); 
 	// can record metadata straight from USRP
-	header_str = create_metadata_header( usrp->get_rx_rate(), usrp->get_rx_freq(), usrp->get_rx_gain(), timestamp, segment_samps_size, item_num);
+	header_str = create_metadata_header( usrp->get_rx_rate(), usrp->get_rx_freq(), 
+			usrp->get_rx_gain(), timestamp, segment_samps_size, item_num);
 	//std::cout << std::endl << header_str.size() <<std::endl;
 	// Using lock to avoid collisions with sample writing.
         if(!detachhdr){	pthread_mutex_lock(&mtx);}
@@ -181,8 +162,9 @@ void write_seg_metadata(int fd, uhd::usrp::multi_usrp::sptr usrp, uhd::time_spec
 	
 }
 
-void metadata_handle(int fd, int fd_hdr, bool metadata, bool detachhdr, uhd::usrp::multi_usrp::sptr usrp,
-		unsigned long long * num_total_samps, unsigned long long segment_samps_size, uhd::time_spec_t *g_timestamp) {
+void metadata_handle(int fd, int fd_hdr, bool metadata, bool detachhdr, 
+		uhd::usrp::multi_usrp::sptr usrp, unsigned long long * num_total_samps, 
+		unsigned long long segment_samps_size, uhd::time_spec_t *g_timestamp) {
 	if(metadata) {
 		if(detachhdr){
 			write_seg_metadata(fd_hdr, usrp, g_timestamp, num_total_samps, segment_samps_size, detachhdr);
@@ -222,9 +204,11 @@ template<typename samp_type> void recv_to_file(
 		bool enable_size_map = false,
 		bool continue_on_bad_packet = false,
 		bool metadata = false,
-		bool detachhdr= true
+		bool detachhdr = true,
+		double gps_pc_deltat_s = 0.0
 		){
 	unsigned long long num_total_samps = 0;
+	boost::posix_time::time_duration gps_pc_deltat = boost::posix_time::seconds(gps_pc_deltat_s);
 	//create a receive streamer
 	uhd::stream_args_t stream_args(cpu_format,wire_format);
 	uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
@@ -236,8 +220,12 @@ template<typename samp_type> void recv_to_file(
 	int fd = 0;
 	int fd_hdr = 0;
 	std::string file_hdr = std::string(file);
-	//segment sample size
-	//unsigned long long segment_samps_size = 1000000; 
+	unsigned long long num_samps_to_get = 0;
+	// Max number of ticks to give an execution time guarantee
+	// = (expected number of seconds for record + guard)*pc_ticks_per_second
+	unsigned long long max_ticks = 0;
+	// Guard time in case PC tick right is slightly off
+	const double guard = 1.0;
 
 	if( (fd = open(file.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NONBLOCK, 
 					S_IRWXU|S_IRWXG|S_IRWXO)) < 0 ){
@@ -260,23 +248,37 @@ template<typename samp_type> void recv_to_file(
 		std::cerr << "Element size " << CB_ELEMENT_SIZE << " not an integer # of samples" 
 			<< std::endl;
 	}
-	printf("Elements are %d bytes, %zu samples/element, %zu elements in circular buffer\n",CB_ELEMENT_SIZE,samps_per_element,cbcapacity);
+	printf("Elements are %d bytes, %zu samples/element, %zu elements in circular buffer\n",
+		CB_ELEMENT_SIZE,samps_per_element,cbcapacity);
 	circbuff_element_t read_ele;
-	//setup streaming
+	// Setup streaming
         // STREAM_MODE_NUM_SAMPS_AND_DONE has a limit of 10.7s @ 25MSPS 
 	// so num_requested_samples must be < 268435455 to use this mode
-	// If given a time to record, calculated num_requested_samples
-	// based on the sample rate
+	//
+	// For --time: calculate num_samps_to_get
+	// For --nsamps: num_samps_to_get = num_samples_requested
+	//
+	// However, we also want a guaranteed execution time in case the USRP drops samples
+	// and we don't get num_samps_to_get so we bound the execution time
+	// based on the CPU time as a sanity check. 
+	// CPU time should still not be required to be correct, just tick at a reasonably
+	// close rate to true time for accurate record length
 	uhd::stream_cmd_t stream_cmd((num_requested_samples == 0)?
 			uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS:
 			uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE
 			);
 	if( num_requested_samples == 0 ){
            if( time_requested != 0){
-              num_requested_samples = time_requested*usrp->get_rx_rate();
+              num_samps_to_get = time_requested*usrp->get_rx_rate();
+	      max_ticks = (long)((time_requested+guard)*(double)boost::posix_time::time_duration::ticks_per_second());
 	   }
+	   // If nsamps or time arg not given, use ctrl+c to exit
+	// non-zero num_requested_samples
         }else{
 	   stream_cmd.num_samps = num_requested_samples;
+	   num_samps_to_get = num_requested_samples;
+	   max_ticks = (long)((guard+num_requested_samples*usrp->get_rx_rate())*
+			     (double)boost::posix_time::time_duration::ticks_per_second());
 	}
 	stream_cmd.stream_now = false;
 
@@ -305,6 +307,7 @@ template<typename samp_type> void recv_to_file(
 	rx_stream->issue_stream_cmd(stream_cmd);
         boost::system_time start =  boost::posix_time::from_time_t(std_start_time);
 
+
 	boost::posix_time::time_duration ticks_diff;
 	boost::system_time last_update = start;
 	unsigned long long last_update_samps = 0;
@@ -325,10 +328,8 @@ template<typename samp_type> void recv_to_file(
 
 	//handle metadata writting
 	boost::thread metadata_handle_thread(metadata_handle,fd, fd_hdr, metadata, detachhdr, usrp, &num_total_samps, segsize, &g_timestamp); 
-
         // Main Loop
-	while(not done and (num_requested_samples != num_total_samps 
-				or num_requested_samples == 0)){
+	while(not done and (num_total_samps < num_samps_to_get or num_samps_to_get == 0)){
 
 		boost::system_time now = boost::get_system_time();
 		size_t num_rx_samps = rx_stream->recv((samp_type*)&read_ele,
@@ -383,11 +384,12 @@ template<typename samp_type> void recv_to_file(
 		}
 
 		num_total_samps += num_rx_samps;
-		if( num_total_samps >= num_requested_samples ){
+		/**
+		if( num_total_samps >= num_samps_to_get ){
 			done = true;
-		}
+		}**/
 		if( num_rx_samps != samps_per_element ){
-			if( num_total_samps < num_requested_samples ){
+			if( num_total_samps < num_samps_to_get ){
 				printf("Only got %zu/%zu samples\n",num_rx_samps,samps_per_element);
 			}
 		}
@@ -415,7 +417,11 @@ template<typename samp_type> void recv_to_file(
 				last_update = now;
 			}
 		}
-                ticks_diff = now - start;
+                ticks_diff = now - start - gps_pc_deltat;
+		if( (unsigned long long)ticks_diff.ticks() > max_ticks ){
+			std::cerr << "Max recording time exceeded" << std::endl;
+			break;
+		}
 	}
 	done = true;
 	//wrap up the leftover metadata writing
@@ -501,6 +507,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 	double rate, freq, gain, bw, total_time, setup_time;
 	bool metadata;
 	bool detachhdr;
+	double gps_pc_deltat_s = 0.0;
 	//setup the program options
 	po::options_description desc("Allowed options");
 	desc.add_options()
@@ -528,8 +535,10 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 		("skip-lo", "skip checking LO lock status")
 		("int-n", "tune USRP with integer-N tuning")
 		("metadata", po::value<bool>(&metadata)->default_value(true),"enable metadata, should write =true")
-		("detachhdr", po::value<bool>(&detachhdr)->default_value(true),"enable detachhdr, true by default, set false should write = false")
-		("segsize", po::value<size_t>(&segsize)->default_value(24999936), "segment size for metadata segmentation. To get accurate timestamp, segment size needs to be multiple of element size(1024 by default)")
+		("detachhdr", po::value<bool>(&detachhdr)->default_value(true),
+		"enable detachhdr, true by default, set false should write = false")
+		("segsize", po::value<size_t>(&segsize)->default_value(24999936), 
+		"segment size for metadata segmentation. To get accurate timestamp, segment size needs to be multiple of element size")
 		("starttime", po::value<std::string>(&start_time)->default_value("0"), "set up start streaming time (YYYY-MM-DD H:M:S)")
 		;
 	po::variables_map vm;
@@ -538,7 +547,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 
 	//print the help message
 	if (vm.count("help")){
-		std::cout << boost::format("UHD RX samples to file %s") % desc << std::endl;
+		std::cout << boost::format("specrec %s") % desc << std::endl;
 		return ~0;
 	}
 
@@ -635,6 +644,10 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 			usrp->set_time_now(usrp_time);
 			time_t stdtime = gps_time.to_real();
 			std::cout << "Set USRP with GPS time: "<< ctime(&stdtime) <<std::endl;
+			// Compute delta between GPS time and PC time
+			time_t pc_time = time(0);
+			gps_pc_deltat_s = difftime(pc_time,stdtime);
+			std::cout << "GPS time - PC time (s):" << gps_pc_deltat_s << std::endl;
 		}else{
 			std::cout << "Found GPSDO but no GPS lock, setting usrp time to system time" << std::endl;
 			time_t pc_time = time(0);       		
@@ -650,7 +663,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 		std::cout << "Set USRP time with PC system time: "<< ctime(&pc_time) <<std::endl;
 	}
 
-
 	if (total_num_samps == 0){
 		std::signal(SIGINT, &sig_int_handler);
 		std::cout << "Press Ctrl + C to stop streaming..." << std::endl;
@@ -658,7 +670,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 
 #define recv_to_file_args(format) \
 	(usrp, format, wirefmt, file, start_time, cbcapacity, total_num_samps,segsize, total_time, bw_summary, \
-	 stats, null, enable_size_map, continue_on_bad_packet,metadata,detachhdr)
+	 stats, null, enable_size_map, continue_on_bad_packet,metadata,detachhdr,gps_pc_deltat_s)
 	//recv to file
 	if (type == "double") recv_to_file<std::complex<double> >recv_to_file_args("fc64");
 	else if (type == "float") recv_to_file<std::complex<float> >recv_to_file_args("fc32");
