@@ -229,7 +229,7 @@ def truncate_file(options,args):
         stop_point = options.start + options.nsamples
         count = 0
 	fileName = args[1].split('.')
-	while stopPoint < length:
+	while stop_point < length:
 	    args[1] = fileName[0] + '_' + str(count) + '.' + fileName[1]
 	    the_config = propagate_headers(options,args)
 	    tb = buildblock(the_config)
