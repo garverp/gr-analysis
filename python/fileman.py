@@ -221,7 +221,23 @@ class buildblock(gr.top_block):
                 fsink = blocks.file_sink(gr.sizeof_short, config['outfile'])
                 self.connect(fsrc, head,cpxfloat_to_ishort,fsink)
 
+    
+
+    
 def truncate_file(options,args):
+    if options.repeat_end:
+        stop_point = options.start + options.nsamples
+        count = 0
+	fileName = args[1].split('.')
+	while stopPoint < length:
+	    args[1] = fileName[0] + '_' + str(count) + '.' + fileName[1]
+	    the_config = propagate_headers(options,args)
+	    tb = buildblock(the_config)
+	    tb.run()
+	    count = count + 1
+	    options.start = stop_point
+	    stop_point = stop_point + options.nsamples
+	options.nsamples = options.length - options.start
     #Propagate and update header. Return flowgraph config.
     the_config = propagate_headers(options,args)
     #Build the flowgraph

@@ -21,6 +21,9 @@ def get_options():
     parser.add_option("-t", "--output-type", type="choice", default="unknown",
             choices=fileman.SNAME_TO_ENUM.keys(), help="Output data type. \
                      [sc16|fc32|b8] Default is same as input")
+    parser.add_option("-r", "--repeat-end", action="store_true", default=False,
+	   help="Repeat until all data has been split")
+    parser.add_option("-l", "--length", type="eng_float", default=0)
                      
     (options, args) = parser.parse_args()
     if len(args) != 2:
