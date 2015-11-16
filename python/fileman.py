@@ -221,7 +221,50 @@ class buildblock(gr.top_block):
                 fsink = blocks.file_sink(gr.sizeof_short, config['outfile'])
                 self.connect(fsrc, head,cpxfloat_to_ishort,fsink)
 
+
+#Convert time input to sample number
+def time_to_sample(options,args):
+    #Open header file
+    infile = args[0]
+    infile_hdr = infile + '.hdr'
+    handle_in = open(infile_hdr, "rb")
+    hdr_in, hdr_extra_in, handle_in = read_single_header(handle_in)
+    info_in = parse_file_metadata.parse_header(hdr_in,False)
+    time_in = info_in["rx_time"]
+    sample_start = 0
+    #Find data chunk where time is in
+    while options.start > time_in:
+	hdr_in, hdr_extra_in, handle_in = read_single_header(handle_in)
+        info_in = parse_file_metadata.parse_header(hdr_in,False)
+        time_in2 = info_in["rx_time"]
+	if options.start < time_in2:
+	   sample_start = sample_start + (options.start - time_in)*info_in["rx_rate"]
+           break
+        time_in = time_in2
+        sample_start = sample_start + info_in["nitems"]
+    #Set start point and sample step to samples
+    options.start = sample_start
+    options.nsamples = options.nsamples * info_in["rx_rate"]
+
 def truncate_file(options,args):
+    #Check if input is in time format
+    if options.timeMode:
+        time_to_sample(options,args)
+    #Check if need to chunk whole file
+    if options.repeat_end:
+        stop_point = options.start + options.nsamples
+        count = 0
+	fileName = args[1].split('.')
+	while stop_point < options.length:
+	    args[1] = fileName[0] + '_' + str(count) + '.' + fileName[1]
+	    the_config = propagate_headers(options,args)
+	    tb = buildblock(the_config)
+	    tb.run()
+	    count = count + 1
+	    options.start = stop_point
+	    stop_point = stop_point + options.nsamples
+	options.nsamples = options.length - options.start
+	args[1] = fileName[0] + '_' + str(count) + '.' + fileName[1]
     #Propagate and update header. Return flowgraph config.
     the_config = propagate_headers(options,args)
     #Build the flowgraph
