@@ -98,9 +98,10 @@ def propagate_headers(options,args):
     # Calc sample_len from file size if not specified
     if options.nsamples is not None:
         sample_len = long(options.nsamples)
+	final_index = sample_offset + sample_len
     else:
         sample_len = os.path.getsize(infile)/SNAME_DEFS[shortname_intype][0]
-    final_index = sample_offset + sample_len 
+	final_index = sample_len
 
     # Search input headers until we find the correct one
     while sample_cnt_end <= sample_offset:
@@ -252,10 +253,18 @@ def truncate_file(options,args):
         time_to_sample(options,args)
     #Check if need to chunk whole file
     if options.repeat_end:
+	infile = args[0]
+	infile_hdr = infile + '.hdr'
+	handle_in = open(infile_hdr, "rb")
+	hdr_in, hdr_extra_in, handle_in = read_single_header(handle_in)
+	info_in = parse_file_metadata.parse_header(hdr_in,False)
+	shortname_intype = find_shortname(info_in['cplx'], info_in['type'],
+                info_in['size'])
+	file_length = os.path.getsize(infile)/SNAME_DEFS[shortname_intype][0]
         stop_point = options.start + options.nsamples
         count = 0
 	fileName = args[1].split('.')
-	while stop_point < options.length:
+	while stop_point < file_length:
 	    args[1] = fileName[0] + '_' + str(count) + '.' + fileName[1]
 	    the_config = propagate_headers(options,args)
 	    tb = buildblock(the_config)
@@ -263,7 +272,7 @@ def truncate_file(options,args):
 	    count = count + 1
 	    options.start = stop_point
 	    stop_point = stop_point + options.nsamples
-	options.nsamples = options.length - options.start
+	options.nsamples = file_length - options.start
 	args[1] = fileName[0] + '_' + str(count) + '.' + fileName[1]
     #Propagate and update header. Return flowgraph config.
     the_config = propagate_headers(options,args)
