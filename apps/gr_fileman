@@ -23,7 +23,6 @@ def get_options():
                      [sc16|fc32|b8] Default is same as input")
     parser.add_option("-r", "--repeat-end", action="store_true", default=False,
 	   help="Repeat until all data has been split")
-    parser.add_option("-l", "--length", type="eng_float", default=0, help = "Length of data in samples")
     parser.add_option("-t", "--timeMode", action="store_true", default=False, help="Enter Time Mode")
     
                      
