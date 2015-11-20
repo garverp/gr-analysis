@@ -10,7 +10,8 @@ Tools for High Sample Rate Recording and Post-Processing in GNURadio
 * read_file_metadata: Display metadata headers in human-readable format
 
 ## Installation
-<pre>git clone https://github.gatech.edu/garverp/gr-analysis.git
+These tools are primarily Linux-based. All tools but specrec should theoretically work, but untested on OSX/Windows.
+<pre>git clone https://github.com/garverp/gr-analysis
 cd gr-analysis
 mkdir build && cd build
 cmake ../
