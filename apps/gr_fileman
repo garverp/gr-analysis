@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+
 # Selects a subset of samples out of pre-recorded data
 # Support for headers
 from analysis import fileman
@@ -23,8 +23,9 @@ def get_options():
                      [sc16|fc32|b8] Default is same as input")
     parser.add_option("-r", "--repeat-end", action="store_true", default=False,
 	   help="Repeat until all data has been split")
+  
     parser.add_option("-t", "--timeMode", action="store_true", default=False, help="Enter Time Mode")
-    
+    parser.add_option("-d", "--deleteOriginal", action="store_true", default=False, help="Deletes original input file")
                      
     (options, args) = parser.parse_args()
     if len(args) != 2:
