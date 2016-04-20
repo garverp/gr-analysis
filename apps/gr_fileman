@@ -24,7 +24,7 @@ def get_options():
     parser.add_option("-r", "--repeat-end", action="store_true", default=False,
 	   help="Repeat until all data has been split")
     parser.add_option("-t", "--timeMode", action="store_true", default=False, help="Enter Time Mode")
-    
+    parser.add_option("-d", "--deleteOriginal", action="store_true", default=False, help="Delete original data file")
                      
     (options, args) = parser.parse_args()
     if len(args) != 2:
