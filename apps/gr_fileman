@@ -1,5 +1,5 @@
 #!/usr/bin/python2
-# Selects a subset of samples out of pre-recorded data
+#Selects a subset of samples out of pre-recorded data
 # Support for headers
 from analysis import fileman
 from optparse import OptionParser
@@ -24,7 +24,7 @@ def get_options():
     parser.add_option("-r", "--repeat-end", action="store_true", default=False,
 	   help="Repeat until all data has been split")
     parser.add_option("-t", "--timeMode", action="store_true", default=False, help="Enter Time Mode")
-    
+    parser.add_option("-d", "--deleteOriginal", action="store_true", default=False, help="Delete original data file")
                      
     (options, args) = parser.parse_args()
     if len(args) != 2:
@@ -35,3 +35,7 @@ def get_options():
 if __name__ == '__main__':
     (options, args) = get_options()
     fileman.truncate_file(options,args)
+
+    API Training Shop Blog About 
+
+    © 2016 GitHub, Inc. Help 

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+
 # Selects a subset of samples out of pre-recorded data
 # Support for headers
 
@@ -9,6 +9,7 @@ from gnuradio.eng_option import eng_option
 import pmt
 import sys
 import os
+import math
 
 # Defining Tuple for data types: (itemsize,cpx,format)
 SC16_DEFS = (gr.sizeof_short*2,True,blocks.GR_FILE_SHORT)
@@ -261,16 +262,25 @@ def truncate_file(options,args):
 	shortname_intype = find_shortname(info_in['cplx'], info_in['type'],
                 info_in['size'])
 	file_length = os.path.getsize(infile)/SNAME_DEFS[shortname_intype][0]
+        num_files = math.ceil(file_length / options.nsamples)
+        num_nums  = len(str(num_files)) - 3
         stop_point = options.start + options.nsamples
         count = 0
+	leading_zeros_count = 10
 	fileName = args[1].split('.')
 	while stop_point < file_length:
-	    args[1] = fileName[0] + '_' + str(count) + '.' + fileName[1]
+	    if count >= leading_zeros_count:
+		leading_zeros_count = leading_zeros_count * 10
+		num_nums = num_nums - 1
+	    leading_zeros = ''
+            for i in range(num_nums):
+	    	leading_zeros = leading_zeros + '0'
+	    args[1] = fileName[0] + '_' + leading_zeros + str(count) + '.' + fileName[1]
 	    the_config = propagate_headers(options,args)
 	    tb = buildblock(the_config)
 	    tb.run()
 	    count = count + 1
-	    options.start = stop_point
+	    options.start = stop_point + 1
 	    stop_point = stop_point + options.nsamples
 	options.nsamples = file_length - options.start
 	args[1] = fileName[0] + '_' + str(count) + '.' + fileName[1]
@@ -280,4 +290,7 @@ def truncate_file(options,args):
     tb = buildblock(the_config)
     #Execute
     tb.run()
-
+    #Delete original file if option is selected
+    if options.deleteOriginal:
+	os.remove(infile)
+	os.remove(infile_hdr)
