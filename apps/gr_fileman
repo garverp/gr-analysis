@@ -35,7 +35,3 @@ def get_options():
 if __name__ == '__main__':
     (options, args) = get_options()
     fileman.truncate_file(options,args)
-
-    API Training Shop Blog About 
-
-    © 2016 GitHub, Inc. Help 
