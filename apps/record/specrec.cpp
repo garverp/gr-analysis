@@ -432,6 +432,9 @@ template<typename samp_type> void recv_to_file(
 	// Wait for threads to exit
 	write_thread.join();
 	metadata_handle_thread.join(); 
+    // Stop streaming
+    stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
+    rx_stream->issue_stream_cmd(stream_cmd);
 	close(fd);  
 	if(detachhdr && metadata){
 		close(fd_hdr);
