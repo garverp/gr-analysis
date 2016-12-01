@@ -85,7 +85,8 @@ def make_header(options, filename):
     fmt = type_props[2]
     file_samp_len = long(options.length)
     seg_size = long(options.seg_size)
-    bytes_val = pmt.from_uint64(long(seg_size*ft_to_sz[fmt]))
+    bytes_per_sample = type_props[0]
+    bytes_val = pmt.from_uint64(long(seg_size*bytes_per_sample))
     # Set header vals
     header = pmt.dict_add(header, pmt.intern("version"), ver_val)
     header = pmt.dict_add(header, pmt.intern("size"), size_val)
@@ -108,9 +109,9 @@ def make_header(options, filename):
     header = pmt.dict_add(header, pmt.intern("strt"), start_val)
     num_segments = file_samp_len/seg_size
     if options.verbose:
-        print "Wrote %d headers to: %s (Version %d)" % (num_segments+1,
+        print "Wrote %d headers to: %s (Version %d)" % (num_segments,
                 hdr_filename,pmt.to_long(ver_val))
-    for x in range(0,num_segments,1):
+    for x in range(0,num_segments-1,1):
         # Serialize and write out file
         if extras_present:
             header_str = pmt.serialize_str(header) + extras_str
@@ -122,7 +123,7 @@ def make_header(options, filename):
     
     # Last header is special b/c file size is probably not mult. of seg_size
     header = pmt.dict_delete(header,pmt.intern("bytes"))
-    bytes_remaining = ft_to_sz[fmt]*(file_samp_len - num_segments*long(seg_size))
+    bytes_remaining = bytes_per_sample*(file_samp_len - (num_segments-1)*long(seg_size))
     bytes_val = pmt.from_uint64(bytes_remaining)
     header = pmt.dict_add(header,pmt.intern("bytes"),bytes_val)
     # Serialize and write out file
