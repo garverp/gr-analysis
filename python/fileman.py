@@ -234,6 +234,13 @@ def time_to_sample(options,args):
     info_in = parse_file_metadata.parse_header(hdr_in,False)
     time_in = info_in["rx_time"]
     sample_start = 0
+
+    # Timestamps always occur on first sample. If start time is less than
+    # current sample, we can not time align and exit
+    if options.start < time_in:
+        print 'Requested timestamp: %f (s) < first Timestamp: %f (s),quitting' % (options.start,time_in)
+        sys.exit(-1)
+
     #Find data chunk where time is in
     while options.start > time_in:
 	hdr_in, hdr_extra_in, handle_in = read_single_header(handle_in)

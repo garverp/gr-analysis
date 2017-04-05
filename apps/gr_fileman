@@ -12,18 +12,18 @@ def get_options():
     parser = OptionParser(usage=usage, description=desc,
              option_class=eng_option)
     parser.add_option("-S", "--start", type="eng_float", default=0,
-           help="Starting sample index.  Applies AFTER type conversion \
+           help="Starting sample|second index. Default is first sample|timestamp\
            [default=%default]")
     parser.add_option("-N", "--nsamples", type="eng_float",
-           help="Number of samples to output. If not specified, output all")
+           help="Number of samples|seconds to output. If not specified, output to file end.")
     parser.add_option("-v", "--verbose", action="store_true", default=False,
            help="Verbose Output")
     parser.add_option("-o", "--output-type", type="choice", default="unknown",
             choices=fileman.SNAME_TO_ENUM.keys(), help="Output data type. \
                      [sc16|fc32|b8] Default is same as input")
     parser.add_option("-r", "--repeat-end", action="store_true", default=False,
-	   help="Repeat until all data has been split")
-    parser.add_option("-t", "--timeMode", action="store_true", default=False, help="Enter Time Mode")
+	   help="Divide file into subsections of length N until all data has been split.")
+    parser.add_option("-t", "--timeMode", action="store_true", default=False, help="Enter Time Mode. -N and -S are interpreted in seconds instead of samples. Subsections based on actual timestamps, instead of sample index.")
     parser.add_option("-d", "--deleteOriginal", action="store_true", default=False, help="Delete original data file")
                      
     (options, args) = parser.parse_args()
