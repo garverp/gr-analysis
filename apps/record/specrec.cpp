@@ -33,7 +33,7 @@
 #include <complex>
 #include <ctime>
 #include <boost/atomic.hpp>
-#include <uhd/utils/atomic.hpp>
+//#include <uhd/utils/atomic.hpp>
 // need PMT for metadata headers
 #include <pmt/pmt.h>
 //pthread lib
